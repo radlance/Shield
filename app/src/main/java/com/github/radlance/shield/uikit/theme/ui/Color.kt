@@ -1,4 +1,4 @@
-package com.github.radlance.shield.ui.theme
+package com.github.radlance.shield.uikit.theme.ui
 
 import androidx.compose.ui.graphics.Color
 
