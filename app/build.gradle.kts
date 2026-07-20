@@ -25,6 +25,7 @@ android {
     buildTypes {
         release {
             optimization {
+                isMinifyEnabled = true
                 enable = false
             }
         }
@@ -39,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.lottie.compose)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)

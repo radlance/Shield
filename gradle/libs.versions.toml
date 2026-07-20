@@ -14,9 +14,11 @@ kotlinxSerialization = "1.11.0"
 androidxNavigation = "2.9.8"
 lottieCompose = "6.7.1"
 material3 = "1.5.0-alpha22"
+coreSplashscreen = "1.2.0"
 
 [libraries]
 
+androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }
 lottie-compose = { module = "com.airbnb.android:lottie-compose", version.ref = "lottieCompose" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "androidxNavigation" }
