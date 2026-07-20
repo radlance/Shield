@@ -4,7 +4,7 @@ enum class ColorTheme {
     DYNAMIC,
     TWILIGHT,
     GROVE,
-    SESSIONS,
+    SHIELD,
     SAKURA,
     LAGOON,
     HARVEST,

@@ -41,7 +41,7 @@ class BaseThemeDataStore(
 
             ThemeConfiguration(
                 themeMode = ThemeMode.valueOf(prefs[THEME_MODE_KEY] ?: ThemeMode.SYSTEM.name),
-                colorTheme = ColorTheme.valueOf(prefs[COLOR_THEME_KEY] ?: ColorTheme.SESSIONS.name),
+                colorTheme = ColorTheme.valueOf(prefs[COLOR_THEME_KEY] ?: ColorTheme.SHIELD.name),
                 useDynamicColors = prefs[USE_DYNAMIC_COLORS_KEY] ?: false,
                 isAmoledMode = prefs[IS_AMOLED_MODE_KEY] ?: false,
                 appFont = appFont

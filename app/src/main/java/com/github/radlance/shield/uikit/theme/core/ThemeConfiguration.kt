@@ -6,7 +6,7 @@ import com.github.radlance.shield.uikit.theme.ui.ThemeMode
 
 data class ThemeConfiguration(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val colorTheme: ColorTheme = ColorTheme.SESSIONS,
+    val colorTheme: ColorTheme = ColorTheme.SHIELD,
     val useDynamicColors: Boolean = true,
     val isAmoledMode: Boolean = false,
     val appFont: AppFont = AppFont.Google
