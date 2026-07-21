@@ -8,9 +8,7 @@ interface AlertsRepository {
 
     val alertConfiguration: StateFlow<AlertsConfiguration>
 
-    fun onFocusStart(view: View? = null)
-
-    fun onFocusStop(view: View? = null)
+    fun onFocusChanged(view: View? = null)
 
     suspend fun setHapticsEnabled(enabled: Boolean)
 }

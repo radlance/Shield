@@ -2,10 +2,8 @@ package com.github.radlance.shield.timer.presentation
 
 import android.view.View
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.github.radlance.shield.alerts.domain.AlertsRepository
 import com.github.radlance.shield.timer.domain.TimerRepository
-import kotlinx.coroutines.launch
 
 class TimerViewModel(
     private val timerRepository: TimerRepository,
@@ -16,17 +14,13 @@ class TimerViewModel(
 
     fun startTimer(view: View? = null) {
         if (timerState.value.isTimerRunning) return
-        viewModelScope.launch {
-            timerRepository.start()
-            alertsRepository.onFocusStart(view)
-        }
+        timerRepository.start()
+        alertsRepository.onFocusChanged(view)
     }
 
     fun stopTimer(view: View? = null) {
         if (!timerState.value.isTimerRunning) return
-        viewModelScope.launch {
-            timerRepository.stop()
-            alertsRepository.onFocusStop(view)
-        }
+        timerRepository.stop()
+        alertsRepository.onFocusChanged(view)
     }
 }

@@ -21,11 +21,7 @@ class LocalAlertsRepository(
                 initialValue = AlertsConfiguration()
             )
 
-    override fun onFocusStart(view: View?) {
-        performHaptic(view)
-    }
-
-    override fun onFocusStop(view: View?) {
+    override fun onFocusChanged(view: View?) {
         performHaptic(view)
     }
 
