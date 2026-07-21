@@ -17,9 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import com.github.radlance.shield.home.presentation.HomeScreen
 import com.github.radlance.shield.navigation.bottom.BottomNavBar
 import com.github.radlance.shield.navigation.destination.Home
 import com.github.radlance.shield.navigation.destination.Settings
+import com.github.radlance.shield.timer.presentation.TimerViewModel
 import kotlinx.coroutines.launch
 
 private val bottomNavItems = listOf(Home, Settings)
@@ -27,6 +29,7 @@ private val bottomNavItems = listOf(Home, Settings)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
+    timerViewModel: TimerViewModel,
     onExit: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -84,13 +87,7 @@ fun MainScreen(
             beyondViewportPageCount = 1
         ) { page ->
             when (bottomNavItems[page]) {
-                Home -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(count = 100) {
-                            Text(it.toString())
-                        }
-                    }
-                }
+                Home -> HomeScreen(timerViewModel = timerViewModel)
 
                 Settings -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {

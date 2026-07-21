@@ -7,11 +7,16 @@ import com.github.radlance.shield.uikit.theme.data.ThemeDataStore
 import com.github.radlance.shield.uikit.theme.domain.ThemeRepository
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModelOf
+import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
 
 val themeModule = module {
-    singleOf(::BaseThemeDataStore).bind<ThemeDataStore>()
+    single<ThemeDataStore> {
+        BaseThemeDataStore(
+            dataStore = get(named("theme"))
+        )
+    }
     singleOf(::LocalThemeRepository).bind<ThemeRepository>()
     viewModelOf(::ThemeViewModel)
 }

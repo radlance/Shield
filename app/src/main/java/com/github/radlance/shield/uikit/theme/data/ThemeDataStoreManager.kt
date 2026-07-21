@@ -23,7 +23,7 @@ interface ThemeDataStore {
     suspend fun resetToDefaults()
 }
 
-class BaseThemeDataStore(
+internal class BaseThemeDataStore(
     private val dataStore: DataStore<Preferences>
 ) : ThemeDataStore {
 
