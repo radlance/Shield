@@ -25,10 +25,14 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.github.radlance.shield.uikit.tokens.components
 import com.github.radlance.shield.uikit.tokens.corners
 import com.github.radlance.shield.uikit.tokens.icons
@@ -135,10 +139,16 @@ fun ShieldControlBar(
                     .align(Alignment.Center)
                     .offset(x = 32.dp)
             ) {
-                Text(
-                    text = "000000:00:00",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
+                BasicText(
+                    text = "00:00:00",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = contentColor
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 14.sp),
+                    modifier = Modifier.widthIn(max = 128.dp)
                 )
             }
         }
