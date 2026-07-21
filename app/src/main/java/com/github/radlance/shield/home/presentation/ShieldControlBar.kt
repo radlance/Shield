@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconToggleButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButtonShapes
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +16,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.github.radlance.shield.uikit.tokens.components
 import com.github.radlance.shield.uikit.tokens.corners
+import com.github.radlance.shield.uikit.tokens.icons
+import com.github.radlance.shield.uikit.vector.ModeOffOnIcon
 
 @Composable
 fun ShieldControlBar(
@@ -68,6 +71,10 @@ fun ShieldControlBar(
                 height = MaterialTheme.components.controlBarItemWidthWide
             )
     ) {
-        // TODO
+        Icon(
+            imageVector = ModeOffOnIcon,
+            contentDescription = null,
+            modifier = Modifier.size(MaterialTheme.icons.xxl)
+        )
     }
 }
