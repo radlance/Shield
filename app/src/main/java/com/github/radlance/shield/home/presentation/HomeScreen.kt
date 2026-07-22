@@ -47,26 +47,26 @@ fun HomeScreen(
 
     val mockServers = remember {
         listOf(
-            MockServerItem(1, "Нидерланды", "10 Gbps"),
-            MockServerItem(2, "Германия", "10 Gbps"),
-            MockServerItem(3, "Финляндия", "1 Gbps"),
-            MockServerItem(4, "Швеция", "10 Gbps"),
-            MockServerItem(5, "Швейцария", "1 Gbps"),
-            MockServerItem(6, "Великобритания", "10 Gbps"),
-            MockServerItem(7, "Франция", "10 Gbps"),
-            MockServerItem(8, "Польша", "1 Gbps"),
-            MockServerItem(9, "США (Восток)", "10 Gbps"),
-            MockServerItem(10, "США (Запад)", "10 Gbps"),
-            MockServerItem(11, "Канада", "1 Gbps"),
-            MockServerItem(12, "Япония", "10 Gbps"),
-            MockServerItem(13, "Южная Корея", "1 Gbps"),
-            MockServerItem(14, "Сингапур", "10 Gbps"),
-            MockServerItem(15, "Австралия", "1 Gbps"),
-            MockServerItem(16, "Турция", "1 Gbps"),
-            MockServerItem(17, "ОАЭ", "10 Gbps"),
-            MockServerItem(18, "Испания", "1 Gbps"),
-            MockServerItem(19, "Италия", "1 Gbps"),
-            MockServerItem(20, "Норвегия", "10 Gbps")
+            MockServerItem(1, "🇳🇱", "Нидерланды", "10 Gbps"),
+            MockServerItem(2, "🇩🇪", "Германия", "10 Gbps"),
+            MockServerItem(3, "🇫🇮", "Финляндия", "1 Gbps"),
+            MockServerItem(4, "🇸🇪", "Швеция", "10 Gbps"),
+            MockServerItem(5, "🇨🇭", "Швейцария", "1 Gbps"),
+            MockServerItem(6, "🇬🇧", "Великобритания", "10 Gbps"),
+            MockServerItem(7, "🇫🇷", "Франция", "10 Gbps"),
+            MockServerItem(8, "🇵🇱", "Польша", "1 Gbps"),
+            MockServerItem(9, "🇺🇸", "США (Восток)", "10 Gbps"),
+            MockServerItem(10, "🇺🇸", "США (Запад)", "10 Gbps"),
+            MockServerItem(11, "🇨🇦", "Канада", "1 Gbps"),
+            MockServerItem(12, "🇯🇵", "Япония", "10 Gbps"),
+            MockServerItem(13, "🇰🇷", "Южная Корея", "1 Gbps"),
+            MockServerItem(14, "🇸🇬", "Сингапур", "10 Gbps"),
+            MockServerItem(15, "🇦🇺", "Австралия", "1 Gbps"),
+            MockServerItem(16, "🇹🇷", "Турция", "1 Gbps"),
+            MockServerItem(17, "🇦🇪", "ОАЭ", "10 Gbps"),
+            MockServerItem(18, "🇪🇸", "Испания", "1 Gbps"),
+            MockServerItem(19, "🇮🇹", "Италия", "1 Gbps"),
+            MockServerItem(20, "🇳🇴", "Норвегия", "10 Gbps")
         )
     }
 
