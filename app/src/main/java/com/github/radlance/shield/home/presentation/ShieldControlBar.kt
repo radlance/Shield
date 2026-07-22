@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.radlance.shield.uikit.tokens.components
@@ -105,7 +106,7 @@ fun ShieldControlBar(
                 contentDescription = null,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .offset(x = iconOffsetX)
+                    .offset { IntOffset(x = iconOffsetX.roundToPx(), y = 0) }
                     .size(MaterialTheme.icons.xxl)
             )
 
