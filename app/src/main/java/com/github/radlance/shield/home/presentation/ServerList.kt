@@ -1,12 +1,9 @@
 package com.github.radlance.shield.home.presentation
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -17,6 +14,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,7 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +69,9 @@ import com.github.radlance.shield.R
 import com.github.radlance.shield.common.presentation.InfoLayout
 import com.github.radlance.shield.uikit.tokens.components
 import com.github.radlance.shield.uikit.tokens.spacing
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +86,8 @@ fun CollapsibleServerList(
     isRefreshing: Boolean = false
 ) {
     var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
+    var isLocalRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
@@ -95,18 +98,17 @@ fun CollapsibleServerList(
         label = "ChevronRotation"
     )
 
-    val infiniteTransition = rememberInfiniteTransition(label = "RefreshInfinite")
-    val refreshRotation by if (isRefreshing) {
-        infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1000, easing = LinearEasing)
-            ),
-            label = "RefreshRotation"
-        )
-    } else {
-        rememberUpdatedState(0f)
+    val currentlyRefreshing = isRefreshing || isLocalRefreshing
+
+    val handleRefresh: () -> Unit = {
+        if (!currentlyRefreshing) {
+            scope.launch {
+                isLocalRefreshing = true
+                onRefresh?.invoke()
+                delay(1000.milliseconds)
+                isLocalRefreshing = false
+            }
+        }
     }
 
     Column(
@@ -161,19 +163,38 @@ fun CollapsibleServerList(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
                 ) {
-                    onRefresh?.let { refreshAction ->
+                    onRefresh?.let {
                         IconButton(
-                            onClick = refreshAction,
+                            onClick = handleRefresh,
                             modifier = Modifier.size(36.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "Refresh",
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .graphicsLayer { rotationZ = refreshRotation },
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            AnimatedContent(
+                                targetState = currentlyRefreshing,
+                                transitionSpec = {
+                                    (fadeIn(animationSpec = tween(200)) + scaleIn(
+                                        initialScale = 0.8f,
+                                        animationSpec = tween(200)
+                                    )) togetherWith
+                                            (fadeOut(animationSpec = tween(200)) + scaleOut(
+                                                targetScale = 0.8f,
+                                                animationSpec = tween(200)
+                                            ))
+                                },
+                                label = "RefreshLoadingTransition"
+                            ) { refreshing ->
+                                if (refreshing) {
+                                    LoadingIndicator(
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Refresh,
+                                        contentDescription = "Refresh",
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
 
