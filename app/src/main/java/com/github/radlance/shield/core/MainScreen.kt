@@ -87,7 +87,10 @@ fun MainScreen(
             beyondViewportPageCount = 1
         ) { page ->
             when (bottomNavItems[page]) {
-                Home -> HomeScreen(timerViewModel = timerViewModel)
+                Home -> HomeScreen(
+                    timerViewModel = timerViewModel,
+                    scrollBehavior = scrollBehavior
+                )
 
                 Settings -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {

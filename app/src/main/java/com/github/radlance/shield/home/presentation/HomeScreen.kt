@@ -29,11 +29,22 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.material3.TopAppBarScrollBehavior
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreen(
     timerViewModel: TimerViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     val timerState by timerViewModel.timerState.collectAsStateWithLifecycle()
 
@@ -72,8 +83,70 @@ fun HomeScreen(
 
     val currentServers = if (refreshCount % 4 < 2) mockServers else emptyList()
 
+    val isAtTop by remember(currentServers) {
+        derivedStateOf {
+            if (currentServers.isEmpty()) {
+                true
+            } else {
+                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+            }
+        }
+    }
+
+    LaunchedEffect(isAtTop, scrollBehavior) {
+        snapshotFlow {
+            isAtTop to scrollBehavior?.state?.contentOffset
+        }.collect { (atTop, offset) ->
+            if (atTop && offset != null && offset != 0f) {
+                scrollBehavior?.state?.contentOffset = 0f
+            }
+        }
+    }
+
+    val customNestedScrollConnection = remember(scrollBehavior, isAtTop) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val consumed = scrollBehavior?.nestedScrollConnection?.onPreScroll(available, source) ?: Offset.Zero
+                if (isAtTop && scrollBehavior?.state?.contentOffset != 0f) {
+                    scrollBehavior?.state?.contentOffset = 0f
+                }
+                return consumed
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                val result = scrollBehavior?.nestedScrollConnection?.onPostScroll(consumed, available, source) ?: Offset.Zero
+                if (isAtTop && scrollBehavior?.state?.contentOffset != 0f) {
+                    scrollBehavior?.state?.contentOffset = 0f
+                }
+                return result
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                val consumed = scrollBehavior?.nestedScrollConnection?.onPreFling(available) ?: Velocity.Zero
+                if (isAtTop && scrollBehavior?.state?.contentOffset != 0f) {
+                    scrollBehavior?.state?.contentOffset = 0f
+                }
+                return consumed
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                val result = scrollBehavior?.nestedScrollConnection?.onPostFling(consumed, available) ?: Velocity.Zero
+                if (isAtTop && scrollBehavior?.state?.contentOffset != 0f) {
+                    scrollBehavior?.state?.contentOffset = 0f
+                }
+                return result
+            }
+        }
+    }
+
     Surface(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(customNestedScrollConnection),
         color = MaterialTheme.colorScheme.background
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -116,7 +189,8 @@ fun HomeScreen(
                     ServerList(
                         items = currentServers,
                         listState = listState,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        scrollBehavior = scrollBehavior
                     )
                 }
             }

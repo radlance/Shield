@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -44,11 +45,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.shapes
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -59,14 +63,31 @@ import com.github.radlance.shield.common.presentation.InfoLayout
 import com.github.radlance.shield.uikit.tokens.components
 import com.github.radlance.shield.uikit.tokens.spacing
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ServerList(
     items: List<MockServerItem>,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState()
+    listState: LazyListState = rememberLazyListState(),
+    scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
+    val infoScrollState = rememberScrollState()
     var selectedId by remember(items) { mutableStateOf(items.firstOrNull()?.id) }
+
+    LaunchedEffect(listState, items, scrollBehavior, infoScrollState) {
+        snapshotFlow {
+            val atTop = if (items.isEmpty()) {
+                infoScrollState.value == 0
+            } else {
+                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+            }
+            atTop to scrollBehavior?.state?.contentOffset
+        }.collect { (atTop, offset) ->
+            if (atTop && offset != null && offset < 0f) {
+                scrollBehavior?.state?.contentOffset = 0f
+            }
+        }
+    }
 
     Box(
         modifier = modifier.fillMaxSize()
@@ -100,7 +121,7 @@ fun ServerList(
             modifier = Modifier.fillMaxSize()
         ) {
             InfoLayout(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
+                modifier = Modifier.verticalScroll(infoScrollState),
                 icon = Icons.Rounded.NewReleases,
                 title = { stringResource(R.string.empty_server_list) }
             ) {
