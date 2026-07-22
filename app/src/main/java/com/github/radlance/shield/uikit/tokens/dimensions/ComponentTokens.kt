@@ -22,5 +22,6 @@ data class ComponentTokens(
     val controlBarItemSize: Dp,
     val controlBarItemWidthWide: Dp,
     val onboardingImageContainer: Dp,
-    val onboardingIndicatorHeight: Dp
+    val onboardingIndicatorHeight: Dp,
+    val loadingIndicator: Dp
 )

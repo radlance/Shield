@@ -5,39 +5,35 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Velocity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.radlance.shield.timer.presentation.TimerViewModel
 import com.github.radlance.shield.uikit.tokens.spacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
-
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.unit.Velocity
-import androidx.compose.material3.TopAppBarScrollBehavior
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -50,13 +46,9 @@ fun HomeScreen(
 
     val view = LocalView.current
     val listState = rememberLazyListState()
+    val scrollState = rememberScrollState()
 
-    var isRefreshing by remember { mutableStateOf(false) }
-    var refreshCount by remember { mutableIntStateOf(0) }
-    val scope = rememberCoroutineScope()
-    val pullToRefreshState = rememberPullToRefreshState()
-
-    val mockServers = remember {
+    val primaryServers = remember {
         listOf(
             MockServerItem(1, "🇳🇱", "Нидерланды", "10 Gbps"),
             MockServerItem(2, "🇩🇪", "Германия", "10 Gbps"),
@@ -67,29 +59,58 @@ fun HomeScreen(
             MockServerItem(7, "🇫🇷", "Франция", "10 Gbps"),
             MockServerItem(8, "🇵🇱", "Польша", "1 Gbps"),
             MockServerItem(9, "🇺🇸", "США (Восток)", "10 Gbps"),
-            MockServerItem(10, "🇺🇸", "США (Запад)", "10 Gbps"),
+            MockServerItem(10, "🇺🇸", "США (Запад)", "10 Gbps")
+        )
+    }
+
+    val backupServers = remember {
+        listOf(
             MockServerItem(11, "🇨🇦", "Канада", "1 Gbps"),
             MockServerItem(12, "🇯🇵", "Япония", "10 Gbps"),
             MockServerItem(13, "🇰🇷", "Южная Корея", "1 Gbps"),
             MockServerItem(14, "🇸🇬", "Сингапур", "10 Gbps"),
-            MockServerItem(15, "🇦🇺", "Австралия", "1 Gbps"),
-            MockServerItem(16, "🇹🇷", "Турция", "1 Gbps"),
-            MockServerItem(17, "🇦🇪", "ОАЭ", "10 Gbps"),
-            MockServerItem(18, "🇪🇸", "Испания", "1 Gbps"),
-            MockServerItem(19, "🇮🇹", "Италия", "1 Gbps"),
-            MockServerItem(20, "🇳🇴", "Норвегия", "10 Gbps")
+            MockServerItem(15, "🇦🇺", "Австралия", "1 Gbps")
         )
     }
 
-    val currentServers = if (refreshCount % 4 < 2) mockServers else emptyList()
+    val initialMockGroups = remember(primaryServers, backupServers) {
+        listOf(
+            ServerGroup(
+                title = "Основная подписка",
+                items = primaryServers,
+                onRefresh = {}
+            ),
+            ServerGroup(
+                title = "Резервные серверы",
+                items = backupServers,
+                onRefresh = {}
+            )
+        )
+    }
 
-    val isAtTop by remember(currentServers) {
-        derivedStateOf {
-            if (currentServers.isEmpty()) {
-                true
-            } else {
-                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+    var serverGroups by remember {
+        mutableStateOf<List<ServerGroup>>(emptyList())
+    }
+
+    var isLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    val handleAddServers: () -> Unit = {
+        if (!isLoading) {
+            scope.launch {
+                isLoading = true
+                delay(1500.milliseconds)
+                serverGroups = initialMockGroups
+                isLoading = false
             }
+        }
+    }
+
+    var selectedServerId by remember { mutableStateOf<Int?>(1) }
+
+    val isAtTop by remember {
+        derivedStateOf {
+            scrollState.value == 0
         }
     }
 
@@ -166,33 +187,16 @@ fun HomeScreen(
                     modifier = Modifier.padding(MaterialTheme.spacing.m)
                 )
 
-                PullToRefreshBox(
-                    isRefreshing = isRefreshing,
-                    onRefresh = {
-                        scope.launch {
-                            isRefreshing = true
-                            delay(1500.milliseconds)
-                            refreshCount++
-                            isRefreshing = false
-                        }
-                    },
-                    state = pullToRefreshState,
-                    indicator = {
-                        PullToRefreshDefaults.LoadingIndicator(
-                            state = pullToRefreshState,
-                            isRefreshing = isRefreshing,
-                            modifier = Modifier.align(Alignment.TopCenter)
-                        )
-                    },
+                ServerList(
+                    groups = serverGroups,
+                    isLoading = isLoading,
+                    selectedId = selectedServerId,
+                    onServerSelected = { selectedServerId = it },
+                    onPasteFromClipboard = handleAddServers,
+                    onQrCodeClick = handleAddServers,
+                    scrollState = scrollState,
                     modifier = Modifier.weight(1f)
-                ) {
-                    ServerList(
-                        items = currentServers,
-                        listState = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        scrollBehavior = scrollBehavior
-                    )
-                }
+                )
             }
 
             AddMenu(

@@ -3,7 +3,7 @@ package com.github.radlance.shield.common.presentation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -23,7 +23,7 @@ fun InfoLayout(
     content: @Composable () -> Unit
 ) {
     Box(
-        modifier.fillMaxSize(),
+        modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
         Column(

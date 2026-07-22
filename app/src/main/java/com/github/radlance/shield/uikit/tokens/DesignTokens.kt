@@ -73,6 +73,7 @@ val TokensCompact = DesignTokens(
         controlBarItemWidthWide = 128.dp,
         onboardingImageContainer = 280.dp,
         onboardingIndicatorHeight  = 10.dp,
+        loadingIndicator = 115.dp
     ),
     elevation = ElevationTokens(
         level0 = 0.dp,

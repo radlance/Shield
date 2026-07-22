@@ -1,19 +1,28 @@
 package com.github.radlance.shield.home.presentation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,43 +30,43 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.shapes
 import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.github.radlance.shield.R
 import com.github.radlance.shield.common.presentation.InfoLayout
 import com.github.radlance.shield.uikit.tokens.components
@@ -65,169 +74,154 @@ import com.github.radlance.shield.uikit.tokens.spacing
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ServerList(
+fun CollapsibleServerList(
+    title: String,
     items: List<MockServerItem>,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState(),
-    scrollBehavior: TopAppBarScrollBehavior? = null
+    isInitiallyExpanded: Boolean = true,
+    selectedId: Int? = null,
+    onServerSelected: (Int) -> Unit = {},
+    onRefresh: (() -> Unit)? = null,
+    isRefreshing: Boolean = false
 ) {
-    val infoScrollState = rememberScrollState()
-    var selectedId by remember(items) { mutableStateOf(items.firstOrNull()?.id) }
+    var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
 
-    LaunchedEffect(listState, items, scrollBehavior, infoScrollState) {
-        snapshotFlow {
-            val atTop = if (items.isEmpty()) {
-                infoScrollState.value == 0
-            } else {
-                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-            }
-            atTop to scrollBehavior?.state?.contentOffset
-        }.collect { (atTop, offset) ->
-            if (atTop && offset != null && offset < 0f) {
-                scrollBehavior?.state?.contentOffset = 0f
-            }
-        }
+    val rotationAngle by animateFloatAsState(
+        targetValue = if (isExpanded) 180f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "ChevronRotation"
+    )
+
+    val infiniteTransition = rememberInfiniteTransition(label = "RefreshInfinite")
+    val refreshRotation by if (isRefreshing) {
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1000, easing = LinearEasing)
+            ),
+            label = "RefreshRotation"
+        )
+    } else {
+        rememberUpdatedState(0f)
     }
 
-    Box(
-        modifier = modifier.fillMaxSize()
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = MaterialTheme.spacing.m, vertical = MaterialTheme.spacing.xs)
     ) {
-        AnimatedVisibility(
-            visible = items.isEmpty(),
-            enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
-                    slideInVertically(
-                        initialOffsetY = { 40 },
-                        animationSpec = spring(
-                            dampingRatio = 0.65f,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    ) +
-                    scaleIn(
-                        initialScale = 0.8f,
-                        animationSpec = spring(
-                            dampingRatio = 0.65f,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    ),
-            exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
-                    slideOutVertically(
-                        targetOffsetY = { 40 },
-                        animationSpec = spring(stiffness = Spring.StiffnessLow)
-                    ) +
-                    scaleOut(
-                        targetScale = 0.8f,
-                        animationSpec = spring(stiffness = Spring.StiffnessLow)
-                    ),
-            modifier = Modifier.fillMaxSize()
+        Surface(
+            onClick = { isExpanded = !isExpanded },
+            shape = shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            InfoLayout(
-                modifier = Modifier.verticalScroll(infoScrollState),
-                icon = Icons.Rounded.NewReleases,
-                title = { stringResource(R.string.empty_server_list) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = MaterialTheme.spacing.m,
+                        vertical = MaterialTheme.spacing.s
+                    )
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.m),
-                    modifier = Modifier.fillMaxWidth()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s)
                 ) {
                     Text(
-                        text = stringResource(
-                            R.string.check_subscription,
-                        ),
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                horizontal = MaterialTheme.spacing.l,
-                                vertical = MaterialTheme.spacing.xs
-                            )
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer
                     ) {
-                        Button(
-                            onClick = {},
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(MaterialTheme.components.buttonMedium),
-                            shapes = ButtonDefaults.shapes()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.ContentPaste,
-                                contentDescription = null
+                        Text(
+                            text = items.size.toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(
+                                horizontal = MaterialTheme.spacing.s,
+                                vertical = MaterialTheme.spacing.xxs
                             )
-                            Spacer(Modifier.width(MaterialTheme.spacing.s))
-                            Text(
-                                text = stringResource(R.string.paste_from_clipboard),
-                                style = MaterialTheme.typography.labelLarge
-                            )
-                        }
+                        )
+                    }
+                }
 
-                        FilledTonalButton(
-                            onClick = {},
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(MaterialTheme.components.buttonMedium),
-                            shapes = ButtonDefaults.shapes()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
+                ) {
+                    onRefresh?.let { refreshAction ->
+                        IconButton(
+                            onClick = refreshAction,
+                            modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.QrCode,
-                                contentDescription = null
-                            )
-                            Spacer(Modifier.width(MaterialTheme.spacing.s))
-                            Text(
-                                text = stringResource(R.string.qr_code),
-                                style = MaterialTheme.typography.labelLarge
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = "Refresh",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .graphicsLayer { rotationZ = refreshRotation },
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.KeyboardArrowDown,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            modifier = Modifier
+                                .size(24.dp)
+                                .graphicsLayer { rotationZ = rotationAngle },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         }
 
         AnimatedVisibility(
-            visible = items.isNotEmpty(),
-            enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
-                    slideInVertically(
-                        initialOffsetY = { 40 },
-                        animationSpec = spring(
-                            dampingRatio = 0.65f,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    ) +
-                    scaleIn(
-                        initialScale = 0.8f,
-                        animationSpec = spring(
-                            dampingRatio = 0.65f,
-                            stiffness = Spring.StiffnessLow
-                        )
-                    ),
-            exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
-                    slideOutVertically(
-                        targetOffsetY = { 40 },
-                        animationSpec = spring(stiffness = Spring.StiffnessLow)
-                    ) +
-                    scaleOut(
-                        targetScale = 0.8f,
-                        animationSpec = spring(stiffness = Spring.StiffnessLow)
-                    ),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = MaterialTheme.spacing.m,
-                    end = MaterialTheme.spacing.m,
-                    bottom = MaterialTheme.spacing.s
+            visible = isExpanded,
+            enter = expandVertically(
+                animationSpec = spring(
+                    stiffness = Spring.StiffnessMediumLow,
+                    dampingRatio = Spring.DampingRatioNoBouncy
                 ),
+                expandFrom = Alignment.Top
+            ) + fadeIn(
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+            ),
+            exit = shrinkVertically(
+                animationSpec = spring(
+                    stiffness = Spring.StiffnessMediumLow,
+                    dampingRatio = Spring.DampingRatioNoBouncy
+                ),
+                shrinkTowards = Alignment.Top
+            ) + fadeOut(
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = MaterialTheme.spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
             ) {
-                itemsIndexed(items = items, key = { _, item -> item.id }) { index, item ->
+                items.forEachIndexed { index, item ->
                     val isSelected = item.id == selectedId
 
                     SegmentedListItem(
@@ -255,10 +249,14 @@ fun ServerList(
                                         dampingRatio = Spring.DampingRatioMediumBouncy,
                                         stiffness = Spring.StiffnessMediumLow
                                     )
-                                ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)),
+                                ) + fadeIn(
+                                    animationSpec = spring(stiffness = Spring.StiffnessHigh)
+                                ),
                                 exit = scaleOut(
-                                    animationSpec = spring(stiffness = Spring.StiffnessLow)
-                                ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow))
+                                    animationSpec = spring(stiffness = Spring.StiffnessHigh)
+                                ) + fadeOut(
+                                    animationSpec = spring(stiffness = Spring.StiffnessHigh)
+                                )
                             ) {
                                 Box(
                                     contentAlignment = Alignment.Center,
@@ -278,7 +276,7 @@ fun ServerList(
                                 }
                             }
                         },
-                        onClick = { selectedId = item.id },
+                        onClick = { onServerSelected(item.id) },
                         shapes = ListItemDefaults.segmentedShapes(
                             index,
                             items.size,
@@ -297,6 +295,197 @@ fun ServerList(
                     ) {
                         Text(item.title)
                     }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ServerList(
+    groups: List<ServerGroup>,
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
+    selectedId: Int? = null,
+    onServerSelected: (Int) -> Unit = {},
+    onPasteFromClipboard: () -> Unit = {},
+    onQrCodeClick: () -> Unit = {},
+    scrollState: ScrollState = rememberScrollState()
+) {
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
+        AnimatedVisibility(
+            visible = !isLoading && groups.isEmpty(),
+            enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+                    slideInVertically(
+                        initialOffsetY = { 40 },
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ) +
+                    scaleIn(
+                        initialScale = 0.8f,
+                        animationSpec = spring(
+                            dampingRatio = 0.65f,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    ),
+            exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+                    slideOutVertically(
+                        targetOffsetY = { 40 },
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ) +
+                    scaleOut(
+                        targetScale = 0.8f,
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.Center
+            ) {
+                InfoLayout(
+                    icon = Icons.Rounded.NewReleases,
+                    title = { stringResource(R.string.empty_server_list) }
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.m),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.check_subscription),
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = MaterialTheme.spacing.l,
+                                    vertical = MaterialTheme.spacing.xs
+                                )
+                        ) {
+                            Button(
+                                onClick = onPasteFromClipboard,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(MaterialTheme.components.buttonMedium),
+                                shape = shapes.extraLarge
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.ContentPaste,
+                                    contentDescription = null
+                                )
+                                Spacer(Modifier.width(MaterialTheme.spacing.s))
+                                Text(
+                                    text = stringResource(R.string.paste_from_clipboard),
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+
+                            FilledTonalButton(
+                                onClick = onQrCodeClick,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(MaterialTheme.components.buttonMedium),
+                                shape = shapes.extraLarge
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.QrCode,
+                                    contentDescription = null
+                                )
+                                Spacer(Modifier.width(MaterialTheme.spacing.s))
+                                Text(
+                                    text = stringResource(R.string.qr_code),
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = isLoading,
+            enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+                    slideInVertically(
+                        initialOffsetY = { 40 },
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ) +
+                    scaleIn(
+                        initialScale = 0.8f,
+                        animationSpec = spring(
+                            dampingRatio = 0.65f,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    ),
+            exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+                    slideOutVertically(
+                        targetOffsetY = { 40 },
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ) +
+                    scaleOut(
+                        targetScale = 0.8f,
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                LoadingIndicator(modifier = Modifier.size(MaterialTheme.components.loadingIndicator))
+            }
+        }
+
+        AnimatedVisibility(
+            visible = !isLoading && groups.isNotEmpty(),
+            enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+                    slideInVertically(
+                        initialOffsetY = { 40 },
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ) +
+                    scaleIn(
+                        initialScale = 0.8f,
+                        animationSpec = spring(
+                            dampingRatio = 0.65f,
+                            stiffness = Spring.StiffnessLow
+                        )
+                    ),
+            exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+                    slideOutVertically(
+                        targetOffsetY = { 40 },
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ) +
+                    scaleOut(
+                        targetScale = 0.8f,
+                        animationSpec = spring(stiffness = Spring.StiffnessLow)
+                    ),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                groups.forEach { group ->
+                    CollapsibleServerList(
+                        title = group.title,
+                        items = group.items,
+                        selectedId = selectedId,
+                        onServerSelected = onServerSelected,
+                        onRefresh = group.onRefresh,
+                        isRefreshing = group.isRefreshing
+                    )
                 }
             }
         }
