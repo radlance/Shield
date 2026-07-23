@@ -43,13 +43,14 @@ import com.github.radlance.shield.uikit.vector.ModeOffOnIcon
 fun ShieldControlBar(
     isWorking: Boolean,
     onStartStop: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val containerColor by animateColorAsState(
-        targetValue = if (isWorking) {
-            MaterialTheme.colorScheme.tertiaryContainer
-        } else {
-            MaterialTheme.colorScheme.primary
+        targetValue = when {
+            !enabled -> MaterialTheme.colorScheme.surfaceContainerHigh
+            isWorking -> MaterialTheme.colorScheme.tertiaryContainer
+            else -> MaterialTheme.colorScheme.primary
         },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
@@ -59,10 +60,10 @@ fun ShieldControlBar(
     )
 
     val contentColor by animateColorAsState(
-        targetValue = if (isWorking) {
-            MaterialTheme.colorScheme.onTertiaryContainer
-        } else {
-            MaterialTheme.colorScheme.onPrimary
+        targetValue = when {
+            !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+            isWorking -> MaterialTheme.colorScheme.onTertiaryContainer
+            else -> MaterialTheme.colorScheme.onPrimary
         },
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
@@ -74,11 +75,14 @@ fun ShieldControlBar(
     FilledIconToggleButton(
         checked = isWorking,
         onCheckedChange = { onStartStop() },
+        enabled = enabled,
         colors = IconButtonDefaults.filledIconToggleButtonColors(
             containerColor = containerColor,
             checkedContainerColor = containerColor,
             contentColor = contentColor,
-            checkedContentColor = contentColor
+            checkedContentColor = contentColor,
+            disabledContainerColor = containerColor,
+            disabledContentColor = contentColor
         ),
         shapes = IconToggleButtonShapes(
             shape = CircleShape,

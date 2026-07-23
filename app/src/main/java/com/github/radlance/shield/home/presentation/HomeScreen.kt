@@ -177,6 +177,7 @@ fun HomeScreen(
             ) {
                 ShieldControlBar(
                     isWorking = timerState.isTimerRunning,
+                    enabled = serverGroups.isNotEmpty(),
                     onStartStop = {
                         if (timerState.isTimerRunning) {
                             timerViewModel.stopTimer(view)
