@@ -31,15 +31,27 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
     }
 }
 
 dependencies {
+    implementation(files("libs/libbox.aar"))
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.google.code.scanner)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.lottie.compose)
     implementation(libs.androidx.material.icons.extended)

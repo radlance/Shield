@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -43,7 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
-import com.github.radlance.shield.home.presentation.MockServerItem
+import com.github.radlance.shield.home.presentation.ServerItem
 import com.github.radlance.shield.uikit.tokens.icons
 import com.github.radlance.shield.uikit.tokens.spacing
 import kotlinx.coroutines.delay
@@ -54,13 +55,15 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun CollapsibleServerList(
     title: String,
-    items: List<MockServerItem>,
+    items: List<ServerItem>,
     modifier: Modifier = Modifier,
     isInitiallyExpanded: Boolean = true,
-    selectedId: Int? = null,
-    onServerSelected: (Int) -> Unit = {},
+    selectedId: String? = null,
+    onServerSelected: (String) -> Unit = {},
     onRefresh: (() -> Unit)? = null,
-    isRefreshing: Boolean = false
+    onDelete: (() -> Unit)? = null,
+    isRefreshing: Boolean = false,
+    error: String? = null
 ) {
     var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
     var isLocalRefreshing by remember { mutableStateOf(false) }
@@ -175,6 +178,20 @@ fun CollapsibleServerList(
                         }
                     }
 
+                    onDelete?.let {
+                        IconButton(
+                            onClick = it,
+                            modifier = Modifier.size(MaterialTheme.icons.large)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Delete,
+                                contentDescription = "Delete",
+                                modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier.size(MaterialTheme.icons.large)
@@ -190,6 +207,18 @@ fun CollapsibleServerList(
                     }
                 }
             }
+        }
+
+        error?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(
+                    horizontal = MaterialTheme.spacing.m,
+                    vertical = MaterialTheme.spacing.xs
+                )
+            )
         }
 
         AnimatedVisibility(

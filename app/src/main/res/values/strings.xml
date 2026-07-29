@@ -10,4 +10,24 @@
     <string name="paste_json">Paste JSON</string>
     <string name="empty_server_list">Server list is empty</string>
     <string name="check_subscription">Please check your subscription</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="connecting">Connecting…</string>
+    <string name="reconnecting">Reconnecting…</string>
+    <string name="subscription_url">Subscription URL or VLESS link</string>
+    <string name="subscription_name">Subscription name</string>
+    <string name="add">Add</string>
+    <string name="cancel">Cancel</string>
+    <string name="refresh">Refresh</string>
+    <string name="delete">Delete</string>
+    <string name="invalid_import">No supported VLESS profiles were found</string>
+    <string name="vpn_permission_denied">VPN permission was denied</string>
+    <string name="notification_channel_vpn">VPN connection</string>
+    <string name="notification_connected">Connected through %1$s</string>
+    <string name="notification_connecting">Starting VPN…</string>
+    <string name="diagnostics">Diagnostics</string>
+    <string name="no_diagnostics">No diagnostic events yet</string>
+    <string name="share_logs">Share logs</string>
+    <string name="refresh_subscriptions">Refresh subscriptions</string>
+    <string name="about_shield">Shield is an open-source VLESS VPN client powered by sing-box.</string>
 </resources>

@@ -25,8 +25,8 @@ fun ServerList(
     groups: List<ServerGroup>,
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
-    selectedId: Int? = null,
-    onServerSelected: (Int) -> Unit = {},
+    selectedId: String? = null,
+    onServerSelected: (String) -> Unit = {},
     onPasteFromClipboard: () -> Unit = {},
     onQrCodeClick: () -> Unit = {},
     scrollState: ScrollState = rememberScrollState()
@@ -78,7 +78,9 @@ fun ServerList(
                         selectedId = selectedId,
                         onServerSelected = onServerSelected,
                         onRefresh = group.onRefresh,
-                        isRefreshing = group.isRefreshing
+                        onDelete = group.onDelete,
+                        isRefreshing = group.isRefreshing,
+                        error = group.error
                     )
                 }
             }

@@ -45,7 +45,11 @@ import com.github.radlance.shield.R
 @Composable
 fun AddMenu(
     listState: LazyListState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onAddSubscription: () -> Unit = {},
+    onPasteFromClipboard: () -> Unit = {},
+    onQrCode: () -> Unit = {},
+    onManualInput: () -> Unit = {}
 ) {
     var isScrollingUp by remember { mutableStateOf(true) }
 
@@ -79,11 +83,10 @@ fun AddMenu(
 
     val items =
         listOf(
-            Icons.Filled.Subscriptions to R.string.add_subscription,
-            Icons.Filled.ContentPaste to R.string.paste_from_clipboard,
-            Icons.Filled.QrCode to R.string.qr_code,
-            Icons.Filled.Edit to R.string.manual_input,
-            Icons.Filled.Code to R.string.paste_json,
+            Triple(Icons.Filled.Subscriptions, R.string.add_subscription, onAddSubscription),
+            Triple(Icons.Filled.ContentPaste, R.string.paste_from_clipboard, onPasteFromClipboard),
+            Triple(Icons.Filled.QrCode, R.string.qr_code, onQrCode),
+            Triple(Icons.Filled.Edit, R.string.manual_input, onManualInput),
         )
 
     FloatingActionButtonMenu(
@@ -133,7 +136,10 @@ fun AddMenu(
     ) {
         items.forEach { item ->
             FloatingActionButtonMenuItem(
-                onClick = { fabMenuExpanded = false },
+                onClick = {
+                    fabMenuExpanded = false
+                    item.third()
+                },
                 icon = { Icon(item.first, contentDescription = null) },
                 text = { Text(text = stringResource(item.second)) }
             )

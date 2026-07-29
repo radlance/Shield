@@ -24,13 +24,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
-import com.github.radlance.shield.home.presentation.MockServerItem
+import com.github.radlance.shield.home.presentation.ServerItem
 import com.github.radlance.shield.uikit.tokens.icons
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ServerListItem(
-    item: MockServerItem,
+    item: ServerItem,
     isSelected: Boolean,
     index: Int,
     totalItems: Int,

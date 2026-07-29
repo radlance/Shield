@@ -3,6 +3,7 @@ package com.github.radlance.shield.core
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -18,6 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.github.radlance.shield.navigation.core.AppNavHost
+import com.github.radlance.shield.subscription.presentation.ImportIntentBus
 import com.github.radlance.shield.uikit.theme.core.ThemeViewModel
 import com.github.radlance.shield.uikit.theme.ui.ShieldTheme
 import com.github.radlance.shield.uikit.theme.ui.ThemeMode
@@ -30,6 +32,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleImportIntent(intent)
         val splashScreen = installSplashScreen()
         val animationReady = MutableStateFlow(false)
         lifecycleScope.launch {
@@ -76,5 +79,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleImportIntent(intent)
+    }
+
+    private fun handleImportIntent(intent: Intent?) {
+        val value = when (intent?.action) {
+            Intent.ACTION_VIEW -> intent.dataString
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
+            else -> null
+        }
+        value?.let(ImportIntentBus::offer)
     }
 }

@@ -6,7 +6,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.github.radlance.shield.core.MainScreen
-import com.github.radlance.shield.timer.presentation.TimerViewModel
+import com.github.radlance.shield.home.presentation.HomeViewModel
 import org.koin.compose.viewmodel.koinViewModel
 
 fun NavGraphBuilder.dashGraph(
@@ -14,10 +14,10 @@ fun NavGraphBuilder.dashGraph(
     context: Context
 ) {
     composable<Main> {
-        val timerViewModel = koinViewModel<TimerViewModel>()
+        val homeViewModel = koinViewModel<HomeViewModel>()
 
         MainScreen(
-            timerViewModel = timerViewModel,
+            homeViewModel = homeViewModel,
             onExit = { (context as? Activity)?.finish() }
         )
     }

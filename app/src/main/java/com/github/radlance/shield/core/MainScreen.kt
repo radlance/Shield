@@ -3,12 +3,10 @@ package com.github.radlance.shield.core
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -18,10 +16,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import com.github.radlance.shield.home.presentation.HomeScreen
+import com.github.radlance.shield.home.presentation.HomeViewModel
 import com.github.radlance.shield.navigation.bottom.BottomNavBar
 import com.github.radlance.shield.navigation.destination.Home
 import com.github.radlance.shield.navigation.destination.Settings
-import com.github.radlance.shield.timer.presentation.TimerViewModel
+import com.github.radlance.shield.settings.SettingsScreen
 import kotlinx.coroutines.launch
 
 private val bottomNavItems = listOf(Home, Settings)
@@ -29,7 +28,7 @@ private val bottomNavItems = listOf(Home, Settings)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
-    timerViewModel: TimerViewModel,
+    homeViewModel: HomeViewModel,
     onExit: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -88,17 +87,11 @@ fun MainScreen(
         ) { page ->
             when (bottomNavItems[page]) {
                 Home -> HomeScreen(
-                    timerViewModel = timerViewModel,
+                    viewModel = homeViewModel,
                     scrollBehavior = scrollBehavior
                 )
 
-                Settings -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(count = 100) {
-                            Text(it.toString())
-                        }
-                    }
-                }
+                Settings -> SettingsScreen(homeViewModel = homeViewModel)
             }
         }
     }

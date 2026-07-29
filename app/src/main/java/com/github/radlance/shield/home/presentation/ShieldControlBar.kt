@@ -44,7 +44,8 @@ fun ShieldControlBar(
     isWorking: Boolean,
     onStartStop: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    statusText: String = "00:00:00"
 ) {
     val containerColor by animateColorAsState(
         targetValue = when {
@@ -145,7 +146,7 @@ fun ShieldControlBar(
                     .offset(x = 32.dp)
             ) {
                 BasicText(
-                    text = "00:00:00",
+                    text = statusText,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = contentColor
