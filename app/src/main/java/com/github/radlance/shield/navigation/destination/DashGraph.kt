@@ -7,15 +7,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.github.radlance.shield.core.MainScreen
 import com.github.radlance.shield.home.presentation.HomeViewModel
-import org.koin.compose.viewmodel.koinViewModel
 
 fun NavGraphBuilder.dashGraph(
     navController: NavHostController,
-    context: Context
+    context: Context,
+    homeViewModel: HomeViewModel
 ) {
     composable<Main> {
-        val homeViewModel = koinViewModel<HomeViewModel>()
-
         MainScreen(
             homeViewModel = homeViewModel,
             onExit = { (context as? Activity)?.finish() }

@@ -38,7 +38,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,9 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import com.github.radlance.shield.home.presentation.ServerItem
 import com.github.radlance.shield.uikit.tokens.icons
 import com.github.radlance.shield.uikit.tokens.spacing
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -66,8 +62,6 @@ fun CollapsibleServerList(
     error: String? = null
 ) {
     var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
-    var isLocalRefreshing by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
@@ -78,17 +72,8 @@ fun CollapsibleServerList(
         label = "ChevronRotation"
     )
 
-    val currentlyRefreshing = isRefreshing || isLocalRefreshing
-
     val handleRefresh: () -> Unit = {
-        if (!currentlyRefreshing) {
-            scope.launch {
-                isLocalRefreshing = true
-                onRefresh?.invoke()
-                delay(1000.milliseconds)
-                isLocalRefreshing = false
-            }
-        }
+        if (!isRefreshing) onRefresh?.invoke()
     }
 
     Column(
@@ -149,7 +134,7 @@ fun CollapsibleServerList(
                             modifier = Modifier.size(MaterialTheme.icons.large)
                         ) {
                             AnimatedContent(
-                                targetState = currentlyRefreshing,
+                                targetState = isRefreshing,
                                 transitionSpec = {
                                     (fadeIn(animationSpec = tween(200)) + scaleIn(
                                         initialScale = 0.8f,

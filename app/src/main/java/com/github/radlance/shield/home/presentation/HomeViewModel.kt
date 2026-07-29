@@ -20,6 +20,7 @@ data class HomeUiState(
     val connectionState: VpnConnectionState = VpnConnectionState.Disconnected,
     val busySubscriptionIds: Set<String> = emptySet(),
     val isImporting: Boolean = false,
+    val isInitialized: Boolean = false,
     val message: String? = null
 )
 
@@ -43,7 +44,8 @@ class HomeViewModel(
             selectedProfileId = selected,
             connectionState = connection,
             busySubscriptionIds = busy,
-            isImporting = isImporting
+            isImporting = isImporting,
+            isInitialized = true
         )
     }
 
