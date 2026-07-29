@@ -283,17 +283,25 @@ class ShieldVpnService :
             .setMtu(options.mtu)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) builder.setMetered(false)
 
-        addAddresses(builder, options.inet4Address)
-        addAddresses(builder, options.inet6Address)
+        val hasInet4Address = addAddresses(builder, options.inet4Address)
+        val hasInet6Address = addAddresses(builder, options.inet6Address)
         if (options.autoRoute) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                addRoutes(builder, options.inet4RouteAddress)
-                addRoutes(builder, options.inet6RouteAddress)
+                if (!addRoutes(builder, options.inet4RouteAddress) && hasInet4Address) {
+                    builder.addRoute("0.0.0.0", 0)
+                }
+                if (!addRoutes(builder, options.inet6RouteAddress) && hasInet6Address) {
+                    builder.addRoute("::", 0)
+                }
                 addExcludedRoutes(builder, options.inet4RouteExcludeAddress)
                 addExcludedRoutes(builder, options.inet6RouteExcludeAddress)
             } else {
-                addRoutes(builder, options.inet4RouteRange)
-                addRoutes(builder, options.inet6RouteRange)
+                if (!addRoutes(builder, options.inet4RouteRange) && hasInet4Address) {
+                    builder.addRoute("0.0.0.0", 0)
+                }
+                if (!addRoutes(builder, options.inet6RouteRange) && hasInet6Address) {
+                    builder.addRoute("::", 0)
+                }
             }
             options.dnsServerAddress?.value?.takeIf(String::isNotBlank)?.let(builder::addDnsServer)
         }
@@ -415,18 +423,30 @@ class ShieldVpnService :
             !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
     }
 
-    private fun addAddresses(builder: Builder, iterator: io.nekohasekai.libbox.RoutePrefixIterator) {
+    private fun addAddresses(
+        builder: Builder,
+        iterator: io.nekohasekai.libbox.RoutePrefixIterator
+    ): Boolean {
+        var added = false
         while (iterator.hasNext()) {
             val prefix = iterator.next()
             builder.addAddress(prefix.address(), prefix.prefix())
+            added = true
         }
+        return added
     }
 
-    private fun addRoutes(builder: Builder, iterator: io.nekohasekai.libbox.RoutePrefixIterator) {
+    private fun addRoutes(
+        builder: Builder,
+        iterator: io.nekohasekai.libbox.RoutePrefixIterator
+    ): Boolean {
+        var added = false
         while (iterator.hasNext()) {
             val prefix = iterator.next()
             builder.addRoute(prefix.address(), prefix.prefix())
+            added = true
         }
+        return added
     }
 
     private fun addExcludedRoutes(builder: Builder, iterator: io.nekohasekai.libbox.RoutePrefixIterator) {

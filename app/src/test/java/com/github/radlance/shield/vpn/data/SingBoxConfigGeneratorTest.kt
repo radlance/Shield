@@ -34,12 +34,18 @@ class SingBoxConfigGeneratorTest {
         )
         val root = Json.parseToJsonElement(config).jsonObject
         val inbounds = root.getValue("inbounds").jsonArray
+        val tun = inbounds.single().jsonObject
         val outbounds = root.getValue("outbounds").jsonArray
         val dnsServers = root.getValue("dns").jsonObject.getValue("servers").jsonArray
         val route = root.getValue("route").jsonObject
 
-        assertEquals("tun", inbounds.single().jsonObject.getValue("type").jsonPrimitive.content)
-        assertTrue(inbounds.single().jsonObject.getValue("auto_route").jsonPrimitive.content.toBoolean())
+        assertEquals("tun", tun.getValue("type").jsonPrimitive.content)
+        assertTrue(tun.getValue("auto_route").jsonPrimitive.content.toBoolean())
+        assertEquals("1400", tun.getValue("mtu").jsonPrimitive.content)
+        assertEquals(
+            listOf("0.0.0.0/0", "::/0"),
+            tun.getValue("route_address").jsonArray.map { it.jsonPrimitive.content }
+        )
         assertFalse(config.contains("\"type\":\"mixed\""))
         assertFalse(config.contains("\"type\":\"socks\""))
         assertEquals("vless", outbounds.first().jsonObject.getValue("type").jsonPrimitive.content)

@@ -28,7 +28,11 @@ class SingBoxConfigGenerator {
                             add(kotlinx.serialization.json.JsonPrimitive("172.19.0.1/30"))
                             add(kotlinx.serialization.json.JsonPrimitive("fdfe:dcba:9876::1/126"))
                         }
-                        put("mtu", 9000)
+                        putJsonArray("route_address") {
+                            add(kotlinx.serialization.json.JsonPrimitive("0.0.0.0/0"))
+                            add(kotlinx.serialization.json.JsonPrimitive("::/0"))
+                        }
+                        put("mtu", 1400)
                         put("auto_route", true)
                         put("strict_route", true)
                         put("stack", "mixed")
