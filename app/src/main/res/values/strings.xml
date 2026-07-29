@@ -6,6 +6,15 @@
     <string name="add_subscription">Add subscription</string>
     <string name="paste_from_clipboard">Paste from clipboard</string>
     <string name="qr_code">QR code</string>
+    <string name="qr_scanner_title">Scan QR code</string>
+    <string name="qr_scanner_hint">Place the QR code inside the frame</string>
+    <string name="camera_permission_required">Camera access is required to scan QR codes</string>
+    <string name="grant_camera_permission">Grant camera access</string>
+    <string name="open_app_settings">Open app settings</string>
+    <string name="camera_unavailable">The camera is unavailable on this device</string>
+    <string name="back">Back</string>
+    <string name="flashlight_on">Turn flashlight on</string>
+    <string name="flashlight_off">Turn flashlight off</string>
     <string name="manual_input">Manual input</string>
     <string name="empty_server_list">Server list is empty</string>
     <string name="check_subscription">Please check your subscription</string>

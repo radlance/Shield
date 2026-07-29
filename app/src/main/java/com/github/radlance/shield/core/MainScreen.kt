@@ -87,8 +87,7 @@ fun MainScreen(
         ) { page ->
             when (bottomNavItems[page]) {
                 Home -> HomeScreen(
-                    viewModel = homeViewModel,
-                    scrollBehavior = scrollBehavior
+                    viewModel = homeViewModel
                 )
 
                 Settings -> SettingsScreen(homeViewModel = homeViewModel)

@@ -1,7 +1,7 @@
 package com.github.radlance.shield.home.presentation
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -44,7 +44,7 @@ import com.github.radlance.shield.R
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddMenu(
-    listState: LazyListState,
+    scrollState: ScrollState,
     modifier: Modifier = Modifier,
     onAddSubscription: () -> Unit = {},
     onPasteFromClipboard: () -> Unit = {},
@@ -53,26 +53,22 @@ fun AddMenu(
 ) {
     var isScrollingUp by remember { mutableStateOf(true) }
 
-    LaunchedEffect(listState) {
-        var previousIndex = listState.firstVisibleItemIndex
-        var previousOffset = listState.firstVisibleItemScrollOffset
+    LaunchedEffect(scrollState) {
+        var previousValue = scrollState.value
 
-        snapshotFlow {
-            listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
-        }.collect { (currentIndex, currentOffset) ->
-            if (currentIndex < previousIndex || (currentIndex == previousIndex && currentOffset < previousOffset)) {
+        snapshotFlow { scrollState.value }.collect { currentValue ->
+            if (currentValue < previousValue) {
                 isScrollingUp = true
-            } else if (currentIndex > previousIndex || (currentOffset > previousOffset)) {
+            } else if (currentValue > previousValue) {
                 isScrollingUp = false
             }
-            previousIndex = currentIndex
-            previousOffset = currentOffset
+            previousValue = currentValue
         }
     }
 
     val fabVisible by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex == 0 || !listState.canScrollForward || isScrollingUp
+            scrollState.value == 0 || !scrollState.canScrollForward || isScrollingUp
         }
     }
 

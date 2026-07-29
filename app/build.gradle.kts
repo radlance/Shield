@@ -52,7 +52,10 @@ android {
 dependencies {
     implementation(files("libs/libbox.aar"))
     implementation(libs.androidx.work.runtime.ktx)
-    implementation(libs.google.code.scanner)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.lottie.compose)
     implementation(libs.androidx.material.icons.extended)
