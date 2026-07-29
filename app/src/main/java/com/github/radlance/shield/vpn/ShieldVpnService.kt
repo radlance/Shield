@@ -3,7 +3,6 @@ package com.github.radlance.shield.vpn
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
@@ -28,6 +27,7 @@ import com.github.radlance.shield.diagnostics.DiagnosticLog
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.vpn.data.InterfaceAddressFormatter
 import com.github.radlance.shield.vpn.data.SingBoxConfigGenerator
+import com.github.radlance.shield.vpn.data.VpnStateStore
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
@@ -64,6 +64,7 @@ class ShieldVpnService :
     private val repository by inject<SubscriptionRepository>()
     private val configGenerator by inject<SingBoxConfigGenerator>()
     private val diagnosticLog by inject<DiagnosticLog>()
+    private val vpnStateStore by inject<VpnStateStore>()
     private val connectivity by lazy { getSystemService(ConnectivityManager::class.java) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -74,7 +75,9 @@ class ShieldVpnService :
     private var interfaceListener: InterfaceUpdateListener? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var underlyingNetwork: Network? = null
-    private val localDnsTransport by lazy { AndroidLocalDnsTransport { underlyingNetwork } }
+    private val localDnsTransport by lazy {
+        AndroidLocalDnsTransport(applicationContext) { underlyingNetwork }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -89,8 +92,18 @@ class ShieldVpnService :
                 if (profileId != null) connect(profileId)
             }
             else -> {
-                preferences.getString(KEY_ACTIVE_PROFILE, null)?.let(::connect)
-                    ?: stopSelf()
+                scope.launch {
+                    runCatching { vpnStateStore.getActiveProfileId() }
+                        .onSuccess { profileId ->
+                            profileId?.let(::connect) ?: stopSelf(startId)
+                        }
+                        .onFailure { error ->
+                            diagnosticLog.record(
+                                "Unable to restore VPN state: ${error.message.orEmpty()}"
+                            )
+                            stopSelf(startId)
+                        }
+                }
             }
         }
         return START_STICKY
@@ -133,7 +146,12 @@ class ShieldVpnService :
                 server.startOrReloadService(configGenerator.generate(profile), OverrideOptions())
                 commandServer = server
                 activeProfileId = profile.id
-                preferences.edit().putString(KEY_ACTIVE_PROFILE, profile.id).apply()
+                runCatching { vpnStateStore.setActiveProfileId(profile.id) }
+                    .onFailure { error ->
+                        diagnosticLog.record(
+                            "Unable to persist VPN state: ${error.message.orEmpty()}"
+                        )
+                    }
                 _connectionState.value = VpnConnectionState.Connected(
                     profileId = profile.id,
                     profileName = profile.name,
@@ -162,14 +180,15 @@ class ShieldVpnService :
     private fun disconnect() {
         _connectionState.value = VpnConnectionState.Disconnecting
         connectionJob?.cancel()
-        connectionJob = null
-        closeCore()
-        preferences.edit().remove(KEY_ACTIVE_PROFILE).apply()
         activeProfileId = null
-        _connectionState.value = VpnConnectionState.Disconnected
-        diagnosticLog.record("VPN disconnected")
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        connectionJob = scope.launch {
+            closeCore()
+            clearPersistedProfile()
+            _connectionState.value = VpnConnectionState.Disconnected
+            diagnosticLog.record("VPN disconnected")
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun closeCore() {
@@ -181,12 +200,21 @@ class ShieldVpnService :
         tunDescriptor = null
     }
 
-    private fun fail(message: String) {
+    private suspend fun fail(message: String) {
         diagnosticLog.record("VPN error: $message")
         _connectionState.value = VpnConnectionState.Error(message)
-        preferences.edit().remove(KEY_ACTIVE_PROFILE).apply()
+        clearPersistedProfile()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private suspend fun clearPersistedProfile() {
+        runCatching { vpnStateStore.setActiveProfileId(null) }
+            .onFailure { error ->
+                diagnosticLog.record(
+                    "Unable to clear VPN state: ${error.message.orEmpty()}"
+                )
+            }
     }
 
     private fun buildServiceNotification(content: String): android.app.Notification {
@@ -358,7 +386,7 @@ class ShieldVpnService :
     }
 
     override fun serviceStop() {
-        scope.launch { disconnect() }
+        disconnect()
     }
 
     override fun setSystemProxyEnabled(enabled: Boolean) = Unit
@@ -409,11 +437,11 @@ class ShieldVpnService :
         }
     }
 
-    @Suppress("DEPRECATION")
     private fun findUnderlyingNetwork(): Network? {
+        underlyingNetwork?.takeIf(::isUnderlyingNetwork)?.let { return it }
         val active = connectivity.activeNetwork
         if (active != null && isUnderlyingNetwork(active)) return active
-        return connectivity.allNetworks.firstOrNull(::isUnderlyingNetwork)
+        return null
     }
 
     private fun isUnderlyingNetwork(network: Network): Boolean {
@@ -479,15 +507,11 @@ class ShieldVpnService :
         override fun next(): io.nekohasekai.libbox.NetworkInterface = iterator.next()
     }
 
-    private val preferences by lazy { getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE) }
-
     companion object {
         const val ACTION_CONNECT = "com.github.radlance.shield.action.CONNECT"
         const val ACTION_DISCONNECT = "com.github.radlance.shield.action.DISCONNECT"
         const val EXTRA_PROFILE_ID = "profile_id"
 
-        private const val PREFERENCES = "vpn_service"
-        private const val KEY_ACTIVE_PROFILE = "active_profile"
         private const val NOTIFICATION_CHANNEL = "shield_vpn"
         private const val NOTIFICATION_ID = 10
 

@@ -8,10 +8,10 @@ import androidx.compose.ui.unit.dp
 
 val ModeOffOnIcon: ImageVector
     get() {
-        if (_ModeOffOnIcon != null) {
-            return _ModeOffOnIcon!!
+        if (modeOffOnIconCache != null) {
+            return modeOffOnIconCache!!
         }
-        _ModeOffOnIcon = ImageVector.Builder(
+        modeOffOnIconCache = ImageVector.Builder(
             name = "ModeOffOnIcon",
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
@@ -64,8 +64,7 @@ val ModeOffOnIcon: ImageVector
             }
         }.build()
 
-        return _ModeOffOnIcon!!
+        return modeOffOnIconCache!!
     }
 
-@Suppress("ObjectPropertyName")
-private var _ModeOffOnIcon: ImageVector? = null
+private var modeOffOnIconCache: ImageVector? = null

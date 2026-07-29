@@ -26,6 +26,7 @@ android {
         release {
             optimization {
                 isMinifyEnabled = true
+                isShrinkResources = true
                 enable = false
             }
         }
@@ -43,7 +44,7 @@ android {
             isEnable = true
             reset()
             include("arm64-v8a", "x86_64")
-            isUniversalApk = false
+            isUniversalApk = true
         }
     }
 }

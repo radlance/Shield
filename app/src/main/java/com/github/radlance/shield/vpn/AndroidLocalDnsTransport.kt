@@ -1,9 +1,11 @@
 package com.github.radlance.shield.vpn
 
+import android.content.Context
 import android.net.DnsResolver
 import android.net.Network
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.Looper
 import android.system.ErrnoException
 import androidx.annotation.RequiresApi
 import io.nekohasekai.libbox.ExchangeContext
@@ -18,8 +20,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 class AndroidLocalDnsTransport(
+    context: Context,
     private val networkProvider: () -> Network?
 ) : LocalDNSTransport {
+    private val applicationContext = context.applicationContext
+    private var resolverInstance: Any? = null
+
     override fun raw(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -32,7 +38,7 @@ class AndroidLocalDnsTransport(
                     signal.cancel()
                     continuation.cancel()
                 }
-                DnsResolver.getInstance().rawQuery(
+                resolver().rawQuery(
                     network,
                     message,
                     DnsResolver.FLAG_NO_RETRY,
@@ -114,7 +120,7 @@ class AndroidLocalDnsTransport(
                     else -> null
                 }
                 if (type == null) {
-                    DnsResolver.getInstance().query(
+                    resolver().query(
                         network,
                         domain,
                         DnsResolver.FLAG_NO_RETRY,
@@ -123,7 +129,7 @@ class AndroidLocalDnsTransport(
                         callback
                     )
                 } else {
-                    DnsResolver.getInstance().query(
+                    resolver().query(
                         network,
                         domain,
                         type,
@@ -137,7 +143,24 @@ class AndroidLocalDnsTransport(
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun resolver(): DnsResolver {
+        val current = resolverInstance
+        if (current is DnsResolver) return current
+        return createDnsResolver(applicationContext).also { resolverInstance = it }
+    }
+
     private companion object {
         const val RCODE_NXDOMAIN = 3
+
+        @RequiresApi(Build.VERSION_CODES.Q)
+        fun createDnsResolver(context: Context): DnsResolver =
+            if (Build.VERSION.SDK_INT >= 37) {
+                DnsResolver(context, Looper.getMainLooper())
+            } else {
+                DnsResolver::class.java
+                    .getMethod("getInstance")
+                    .invoke(null) as DnsResolver
+            }
     }
 }
