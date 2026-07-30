@@ -72,6 +72,9 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
     var showImportDialog by remember { mutableStateOf(false) }
     var importInitialValue by remember { mutableStateOf("") }
+    var subscriptionPendingDeletion by remember {
+        mutableStateOf<SubscriptionPendingDeletion?>(null)
+    }
     val permissionDeniedMessage = stringResource(R.string.vpn_permission_denied)
     val onPasteFromClipboard: () -> Unit = {
         clipboardText(context)?.let { viewModel.import("", it) }
@@ -142,7 +145,12 @@ fun HomeScreen(
                 { viewModel.refresh(group.subscription.id) }
             },
             onPing = { viewModel.pingSubscription(group.subscription.id) },
-            onDelete = { viewModel.delete(group.subscription.id) },
+            onDelete = {
+                subscriptionPendingDeletion = SubscriptionPendingDeletion(
+                    id = group.subscription.id,
+                    name = group.subscription.name
+                )
+            },
             isRefreshing = group.subscription.id in state.busySubscriptionIds,
             isPinging = group.subscription.id in state.pingingSubscriptionIds,
             error = group.subscription.lastError
@@ -252,6 +260,62 @@ fun HomeScreen(
             }
         )
     }
+
+    subscriptionPendingDeletion?.let { subscription ->
+        DeleteSubscriptionDialog(
+            subscriptionName = subscription.name,
+            onConfirm = {
+                subscriptionPendingDeletion = null
+                viewModel.delete(subscription.id)
+            },
+            onDismiss = { subscriptionPendingDeletion = null }
+        )
+    }
+}
+
+private data class SubscriptionPendingDeletion(
+    val id: String,
+    val name: String
+)
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun DeleteSubscriptionDialog(
+    subscriptionName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.delete_subscription)) },
+        text = {
+            Text(
+                stringResource(
+                    R.string.delete_subscription_confirmation,
+                    subscriptionName
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                shapes = ButtonDefaults.shapes(),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text(stringResource(R.string.delete))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                shapes = ButtonDefaults.shapes()
+            ) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

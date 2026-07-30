@@ -21,6 +21,9 @@
     <string name="disconnect">Disconnect</string>
     <string name="subscription_url">Subscription URL or VLESS link</string>
     <string name="subscription_name">Subscription name</string>
+    <string name="delete_subscription">Delete subscription</string>
+    <string name="delete_subscription_confirmation">Delete “%1$s” and all its servers? This action cannot be undone.</string>
+    <string name="delete">Delete</string>
     <string name="add">Add</string>
     <string name="cancel">Cancel</string>
     <string name="vpn_permission_denied">VPN permission was denied</string>

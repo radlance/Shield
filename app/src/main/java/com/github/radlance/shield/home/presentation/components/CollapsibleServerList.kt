@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import com.github.radlance.shield.R
 import com.github.radlance.shield.home.presentation.ServerItem
 import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
@@ -86,6 +89,13 @@ fun CollapsibleServerList(
         ),
         label = "ChevronRotation"
     )
+    val titleAutoSize = remember {
+        TextAutoSize.StepBased(
+            minFontSize = 12.sp,
+            maxFontSize = 16.sp,
+            stepSize = 1.sp
+        )
+    }
 
     val handleRefresh: () -> Unit = {
         if (!isRefreshing) onRefresh?.invoke()
@@ -116,13 +126,15 @@ fun CollapsibleServerList(
                     verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text(
+                    BasicText(
                         text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        autoSize = titleAutoSize
                     )
 
                     summary?.let {
@@ -230,7 +242,7 @@ fun CollapsibleServerList(
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Delete,
-                                contentDescription = "Delete",
+                                contentDescription = stringResource(R.string.delete_subscription),
                                 modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
                                 tint = MaterialTheme.colorScheme.error
                             )
