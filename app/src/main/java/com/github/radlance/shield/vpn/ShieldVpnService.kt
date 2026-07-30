@@ -27,8 +27,11 @@ import com.github.radlance.shield.diagnostics.DiagnosticLog
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.vpn.data.InterfaceAddressFormatter
 import com.github.radlance.shield.vpn.data.SingBoxConfigGenerator
+import com.github.radlance.shield.vpn.data.VpnRoutingConfig
 import com.github.radlance.shield.vpn.data.VpnStateStore
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
+import com.github.radlance.shield.vpn.routing.RoutingRuleSetProvider
+import com.github.radlance.shield.vpn.routing.RoutingSettingsRepository
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
 import io.nekohasekai.libbox.ConnectionOwner
@@ -46,6 +49,7 @@ import io.nekohasekai.libbox.WIFIState
 import java.net.Inet6Address
 import java.net.NetworkInterface
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -53,6 +57,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -65,6 +70,8 @@ class ShieldVpnService :
     private val configGenerator by inject<SingBoxConfigGenerator>()
     private val diagnosticLog by inject<DiagnosticLog>()
     private val vpnStateStore by inject<VpnStateStore>()
+    private val routingSettingsRepository by inject<RoutingSettingsRepository>()
+    private val routingRuleSetProvider by inject<RoutingRuleSetProvider>()
     private val connectivity by lazy { getSystemService(ConnectivityManager::class.java) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -87,6 +94,7 @@ class ShieldVpnService :
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_DISCONNECT -> disconnect()
+            ACTION_RELOAD -> serviceReload()
             ACTION_CONNECT -> {
                 val profileId = intent.getStringExtra(EXTRA_PROFILE_ID)
                 if (profileId != null) connect(profileId)
@@ -122,16 +130,22 @@ class ShieldVpnService :
         super.onDestroy()
     }
 
-    private fun connect(profileId: String) {
+    private fun connect(profileId: String, force: Boolean = false) {
         if (prepare(this) != null) {
             _connectionState.value = VpnConnectionState.PermissionRequired
             stopSelf()
             return
         }
-        if (activeProfileId == profileId && _connectionState.value is VpnConnectionState.Connected) return
-        connectionJob?.cancel()
+        if (
+            !force &&
+            activeProfileId == profileId &&
+            _connectionState.value is VpnConnectionState.Connected
+        ) return
+        val previousJob = connectionJob
+        previousJob?.cancel()
         startForeground(NOTIFICATION_ID, buildServiceNotification(getString(R.string.notification_connecting)))
         connectionJob = scope.launch {
+            previousJob?.join()
             val profile = repository.getProfile(profileId)
             if (profile == null) {
                 fail("Selected profile no longer exists")
@@ -139,11 +153,33 @@ class ShieldVpnService :
             }
             _connectionState.value = VpnConnectionState.Connecting(profile.name)
             try {
+                val routingSettings = routingSettingsRepository.settings.first()
+                val ruleSetPaths = if (routingSettings.smartRussianRouting) {
+                    runCatching { routingRuleSetProvider.prepareRuleSets() }
+                        .onFailure { error ->
+                            diagnosticLog.record(
+                                "Smart routing disabled: ${error.message.orEmpty()}"
+                            )
+                        }
+                        .getOrNull()
+                } else {
+                    null
+                }
                 closeCore()
                 underlyingNetwork = findUnderlyingNetwork()
                 val server = CommandServer(this@ShieldVpnService, this@ShieldVpnService)
                 server.start()
-                server.startOrReloadService(configGenerator.generate(profile), OverrideOptions())
+                server.startOrReloadService(
+                    configGenerator.generate(
+                        profile = profile,
+                        routing = VpnRoutingConfig(
+                            ruleSetPaths = ruleSetPaths,
+                            forceDirectDomains = routingSettings.forceDirectDomains,
+                            forceProxyDomains = routingSettings.forceProxyDomains
+                        )
+                    ),
+                    OverrideOptions()
+                )
                 commandServer = server
                 activeProfileId = profile.id
                 runCatching { vpnStateStore.setActiveProfileId(profile.id) }
@@ -158,6 +194,29 @@ class ShieldVpnService :
                     connectedAtElapsedRealtime = SystemClock.elapsedRealtime()
                 )
                 diagnosticLog.record("Connected through ${profile.name}")
+                if (ruleSetPaths != null) {
+                    scope.launch {
+                        runCatching { routingRuleSetProvider.refreshRuleSets() }
+                            .onSuccess { result ->
+                                if (result.updated) {
+                                    diagnosticLog.record(
+                                        "Routing databases updated; they will be used on next reconnect"
+                                    )
+                                }
+                                if (result.failedDownloads > 0) {
+                                    diagnosticLog.record(
+                                        "Unable to update ${result.failedDownloads} routing databases; " +
+                                            "using the last working copies"
+                                    )
+                                }
+                            }
+                            .onFailure { error ->
+                                diagnosticLog.record(
+                                    "Routing database update failed: ${error.message.orEmpty()}"
+                                )
+                            }
+                    }
+                }
                 if (
                     Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
                     ContextCompat.checkSelfPermission(
@@ -170,6 +229,8 @@ class ShieldVpnService :
                         buildServiceNotification(getString(R.string.notification_connected, profile.name))
                     )
                 }
+            } catch (error: CancellationException) {
+                throw error
             } catch (error: Exception) {
                 closeCore()
                 fail(error.message ?: "Unable to start sing-box")
@@ -179,9 +240,11 @@ class ShieldVpnService :
 
     private fun disconnect() {
         _connectionState.value = VpnConnectionState.Disconnecting
-        connectionJob?.cancel()
+        val previousJob = connectionJob
+        previousJob?.cancel()
         activeProfileId = null
         connectionJob = scope.launch {
+            previousJob?.join()
             closeCore()
             clearPersistedProfile()
             _connectionState.value = VpnConnectionState.Disconnected
@@ -384,7 +447,7 @@ class ShieldVpnService :
     }
 
     override fun serviceReload() {
-        activeProfileId?.let(::connect)
+        activeProfileId?.let { profileId -> connect(profileId, force = true) }
     }
 
     override fun serviceStop() {
@@ -512,6 +575,7 @@ class ShieldVpnService :
     companion object {
         const val ACTION_CONNECT = "com.github.radlance.shield.action.CONNECT"
         const val ACTION_DISCONNECT = "com.github.radlance.shield.action.DISCONNECT"
+        const val ACTION_RELOAD = "com.github.radlance.shield.action.RELOAD"
         const val EXTRA_PROFILE_ID = "profile_id"
 
         private const val NOTIFICATION_CHANNEL = "shield_vpn"

@@ -7,4 +7,5 @@ interface VpnController {
 
     fun connect(profileId: String)
     fun disconnect()
+    fun reload()
 }

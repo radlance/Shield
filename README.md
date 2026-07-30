@@ -10,6 +10,7 @@ and sing-box.
 - Direct VLESS import from paste, manual entry, QR, Android share, or deep link
 - VLESS TCP, WebSocket, and gRPC transports with TLS or REALITY
 - Full-device IPv4/IPv6 VPN through Android `VpnService`
+- Smart routing: blocked resources use VPN while Russian domains and networks connect directly
 - Encrypted local profile storage and daily best-effort subscription refresh
 - Foreground connection lifecycle and sanitized diagnostic export
 

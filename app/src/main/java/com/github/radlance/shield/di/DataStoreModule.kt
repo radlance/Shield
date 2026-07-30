@@ -11,6 +11,7 @@ import org.koin.dsl.module
 
 private val Context.alertsDataStore: DataStore<Preferences> by preferencesDataStore(name = "alerts")
 private val Context.themeDataStore: DataStore<Preferences> by preferencesDataStore(name = "theme")
+private val Context.routingDataStore: DataStore<Preferences> by preferencesDataStore(name = "routing")
 private val Context.vpnStateDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "vpn_state",
     produceMigrations = { context ->
@@ -29,5 +30,9 @@ val dataStoreModule = module {
 
     single<DataStore<Preferences>>(named("vpn_state")) {
         androidContext().vpnStateDataStore
+    }
+
+    single<DataStore<Preferences>>(named("routing")) {
+        androidContext().routingDataStore
     }
 }

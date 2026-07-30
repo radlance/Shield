@@ -3,17 +3,33 @@ package com.github.radlance.shield.vpn.data
 import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
+import com.github.radlance.shield.vpn.routing.RoutingRuleSetPaths
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
+data class VpnRoutingConfig(
+    val ruleSetPaths: RoutingRuleSetPaths? = null,
+    val forceDirectDomains: Set<String> = emptySet(),
+    val forceProxyDomains: Set<String> = emptySet()
+)
+
 class SingBoxConfigGenerator {
     private val json = Json { prettyPrint = false }
 
-    fun generate(profile: VlessProfile): String {
+    fun generate(
+        profile: VlessProfile,
+        routing: VpnRoutingConfig = VpnRoutingConfig()
+    ): String {
+        val ruleSetPaths = routing.ruleSetPaths
+        val forceProxyDomains = routing.forceProxyDomains.sorted()
+        val forceDirectDomains =
+            (routing.forceDirectDomains - routing.forceProxyDomains).sorted()
         val root = buildJsonObject {
             putJsonObject("log") {
                 put("level", "info")
@@ -59,6 +75,66 @@ class SingBoxConfigGenerator {
                         put("ip_is_private", true)
                         put("outbound", "direct")
                     })
+                    if (forceProxyDomains.isNotEmpty()) {
+                        add(buildJsonObject {
+                            put("domain_suffix", forceProxyDomains.toJsonArray())
+                            put("action", "route")
+                            put("outbound", "proxy")
+                        })
+                    }
+                    if (forceDirectDomains.isNotEmpty()) {
+                        add(buildJsonObject {
+                            put("domain_suffix", forceDirectDomains.toJsonArray())
+                            put("action", "route")
+                            put("outbound", "direct")
+                        })
+                    }
+                    if (ruleSetPaths != null) {
+                        add(buildJsonObject {
+                            put(
+                                "rule_set",
+                                listOf(
+                                    BLOCKED_DOMAINS_TAG,
+                                    BLOCKED_IPS_TAG,
+                                    BLOCKED_COMMUNITY_IPS_TAG
+                                ).toJsonArray()
+                            )
+                            put("action", "route")
+                            put("outbound", "proxy")
+                        })
+                        add(buildJsonObject {
+                            put(
+                                "rule_set",
+                                listOf(
+                                    AVAILABLE_ONLY_INSIDE_TAG,
+                                    RUSSIAN_DOMAINS_TAG,
+                                    RUSSIAN_IPS_TAG
+                                ).toJsonArray()
+                            )
+                            put("action", "route")
+                            put("outbound", "direct")
+                        })
+                    }
+                }
+                if (ruleSetPaths != null) {
+                    putJsonArray("rule_set") {
+                        add(localRuleSet(BLOCKED_DOMAINS_TAG, ruleSetPaths.blockedDomains))
+                        add(localRuleSet(BLOCKED_IPS_TAG, ruleSetPaths.blockedIps))
+                        add(
+                            localRuleSet(
+                                BLOCKED_COMMUNITY_IPS_TAG,
+                                ruleSetPaths.blockedCommunityIps
+                            )
+                        )
+                        add(
+                            localRuleSet(
+                                AVAILABLE_ONLY_INSIDE_TAG,
+                                ruleSetPaths.availableOnlyInsideDomains
+                            )
+                        )
+                        add(localRuleSet(RUSSIAN_DOMAINS_TAG, ruleSetPaths.russianDomains))
+                        add(localRuleSet(RUSSIAN_IPS_TAG, ruleSetPaths.russianIps))
+                    }
                 }
                 put("default_domain_resolver", "local-dns")
                 put("auto_detect_interface", true)
@@ -78,12 +154,60 @@ class SingBoxConfigGenerator {
                         put("detour", "proxy")
                     })
                 }
+                if (
+                    forceProxyDomains.isNotEmpty() ||
+                    forceDirectDomains.isNotEmpty() ||
+                    ruleSetPaths != null
+                ) {
+                    putJsonArray("rules") {
+                        if (forceProxyDomains.isNotEmpty()) {
+                            add(dnsDomainRule(forceProxyDomains, "remote-dns"))
+                        }
+                        if (forceDirectDomains.isNotEmpty()) {
+                            add(dnsDomainRule(forceDirectDomains, "local-dns"))
+                        }
+                        if (ruleSetPaths != null) {
+                            add(buildJsonObject {
+                                put("rule_set", BLOCKED_DOMAINS_TAG)
+                                put("action", "route")
+                                put("server", "remote-dns")
+                            })
+                            add(buildJsonObject {
+                                put(
+                                    "rule_set",
+                                    listOf(
+                                        AVAILABLE_ONLY_INSIDE_TAG,
+                                        RUSSIAN_DOMAINS_TAG
+                                    ).toJsonArray()
+                                )
+                                put("action", "route")
+                                put("server", "local-dns")
+                            })
+                        }
+                    }
+                }
                 put("final", "remote-dns")
                 put("strategy", "prefer_ipv4")
             }
         }
         return json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), root)
     }
+
+    private fun localRuleSet(tag: String, path: String) = buildJsonObject {
+        put("type", "local")
+        put("tag", tag)
+        put("format", "binary")
+        put("path", path)
+    }
+
+    private fun dnsDomainRule(domains: List<String>, server: String) = buildJsonObject {
+        put("domain_suffix", domains.toJsonArray())
+        put("action", "route")
+        put("server", server)
+    }
+
+    private fun Collection<String>.toJsonArray(): JsonArray =
+        buildJsonArray { forEach { add(JsonPrimitive(it)) } }
 
     private fun vlessOutbound(profile: VlessProfile) = buildJsonObject {
         put("type", "vless")
@@ -133,5 +257,14 @@ class SingBoxConfigGenerator {
                 profile.grpcServiceName?.let { put("service_name", it) }
             }
         }
+    }
+
+    private companion object {
+        const val BLOCKED_DOMAINS_TAG = "geosite-ru-blocked"
+        const val BLOCKED_IPS_TAG = "geoip-ru-blocked"
+        const val BLOCKED_COMMUNITY_IPS_TAG = "geoip-ru-blocked-community"
+        const val AVAILABLE_ONLY_INSIDE_TAG = "geosite-ru-available-only-inside"
+        const val RUSSIAN_DOMAINS_TAG = "geosite-category-ru"
+        const val RUSSIAN_IPS_TAG = "geoip-ru"
     }
 }

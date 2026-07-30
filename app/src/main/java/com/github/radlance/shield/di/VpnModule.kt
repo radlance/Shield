@@ -15,6 +15,10 @@ import com.github.radlance.shield.vpn.data.SingBoxConfigGenerator
 import com.github.radlance.shield.vpn.data.DataStoreVpnStateStore
 import com.github.radlance.shield.vpn.data.VpnStateStore
 import com.github.radlance.shield.vpn.domain.VpnController
+import com.github.radlance.shield.vpn.routing.DataStoreRoutingSettingsRepository
+import com.github.radlance.shield.vpn.routing.RoutingRuleSetProvider
+import com.github.radlance.shield.vpn.routing.RoutingSettingsRepository
+import com.github.radlance.shield.settings.RoutingSettingsViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.core.qualifier.named
@@ -38,5 +42,10 @@ val vpnModule = module {
         DataStoreVpnStateStore(dataStore = get(named("vpn_state")))
     }
     single<VpnController> { AndroidVpnController(androidContext()) }
+    single { RoutingRuleSetProvider(androidContext()) }
+    single<RoutingSettingsRepository> {
+        DataStoreRoutingSettingsRepository(get(named("routing")))
+    }
     viewModelOf(::HomeViewModel)
+    viewModelOf(::RoutingSettingsViewModel)
 }

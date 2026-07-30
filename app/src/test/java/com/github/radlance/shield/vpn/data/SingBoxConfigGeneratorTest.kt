@@ -3,6 +3,7 @@ package com.github.radlance.shield.vpn.data
 import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
+import com.github.radlance.shield.vpn.routing.RoutingRuleSetPaths
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -58,4 +59,96 @@ class SingBoxConfigGeneratorTest {
                 .keys.first { it == "reality" }
         )
     }
+
+    @Test
+    fun ordersBlockedRulesBeforeRussianDirectRules() {
+        val config = SingBoxConfigGenerator().generate(
+            profile = testProfile(),
+            routing = VpnRoutingConfig(
+                ruleSetPaths = testRuleSetPaths(),
+                forceDirectDomains = setOf("direct.example"),
+                forceProxyDomains = setOf("proxy.example")
+            )
+        )
+        val root = Json.parseToJsonElement(config).jsonObject
+        val route = root.getValue("route").jsonObject
+        val dns = root.getValue("dns").jsonObject
+        val routeRules = route.getValue("rules").jsonArray.map { it.jsonObject }
+        val blockedIndex = routeRules.indexOfFirst { rule ->
+            rule["rule_set"]?.jsonArray?.any {
+                it.jsonPrimitive.content == "geosite-ru-blocked"
+            } == true
+        }
+        val russianIndex = routeRules.indexOfFirst { rule ->
+            rule["rule_set"]?.jsonArray?.any {
+                it.jsonPrimitive.content == "geosite-category-ru"
+            } == true
+        }
+        val ruleSets = route.getValue("rule_set").jsonArray.map { it.jsonObject }
+
+        assertTrue(blockedIndex >= 0)
+        assertTrue(russianIndex > blockedIndex)
+        assertEquals("proxy", routeRules[blockedIndex].getValue("outbound").jsonPrimitive.content)
+        assertEquals("direct", routeRules[russianIndex].getValue("outbound").jsonPrimitive.content)
+        assertEquals(6, ruleSets.size)
+        assertEquals(
+            "/routing/geosite-ru-blocked.srs",
+            ruleSets.first().getValue("path").jsonPrimitive.content
+        )
+        assertEquals(
+            listOf("remote-dns", "local-dns", "remote-dns", "local-dns"),
+            dns.getValue("rules").jsonArray.map {
+                it.jsonObject.getValue("server").jsonPrimitive.content
+            }
+        )
+        assertEquals("proxy", route.getValue("final").jsonPrimitive.content)
+        assertEquals("remote-dns", dns.getValue("final").jsonPrimitive.content)
+    }
+
+    @Test
+    fun keepsDomainOverridesWhenSmartRulesAreDisabled() {
+        val config = SingBoxConfigGenerator().generate(
+            profile = testProfile(),
+            routing = VpnRoutingConfig(
+                ruleSetPaths = null,
+                forceDirectDomains = setOf("bank.example"),
+                forceProxyDomains = setOf("blocked.example", "bank.example")
+            )
+        )
+        val root = Json.parseToJsonElement(config).jsonObject
+        val route = root.getValue("route").jsonObject
+        val rules = route.getValue("rules").jsonArray.map { it.jsonObject }
+        val domainRules = rules.filter { "domain_suffix" in it }
+
+        assertFalse(config.contains("geosite-category-ru"))
+        assertFalse("rule_set" in route)
+        assertEquals(1, domainRules.size)
+        assertEquals("proxy", domainRules.single().getValue("outbound").jsonPrimitive.content)
+        assertEquals(
+            listOf("bank.example", "blocked.example"),
+            domainRules.single().getValue("domain_suffix").jsonArray
+                .map { it.jsonPrimitive.content }
+        )
+    }
+
+    private fun testRuleSetPaths() = RoutingRuleSetPaths(
+        blockedDomains = "/routing/geosite-ru-blocked.srs",
+        blockedIps = "/routing/geoip-ru-blocked.srs",
+        blockedCommunityIps = "/routing/geoip-ru-blocked-community.srs",
+        availableOnlyInsideDomains = "/routing/geosite-ru-available-only-inside.srs",
+        russianDomains = "/routing/geosite-category-ru.srs",
+        russianIps = "/routing/geoip-ru.srs"
+    )
+
+    private fun testProfile() = VlessProfile(
+        id = "profile",
+        subscriptionId = "subscription",
+        name = "Node",
+        server = "example.com",
+        port = 443,
+        uuid = "123e4567-e89b-42d3-a456-426614174000",
+        security = VlessSecurity.REALITY,
+        serverName = "www.example.org",
+        realityPublicKey = "public-key"
+    )
 }
