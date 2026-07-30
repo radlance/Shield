@@ -70,6 +70,9 @@ fun HomeScreen(
     var showImportDialog by remember { mutableStateOf(false) }
     var importInitialValue by remember { mutableStateOf("") }
     val permissionDeniedMessage = stringResource(R.string.vpn_permission_denied)
+    val onPasteFromClipboard: () -> Unit = {
+        clipboardText(context)?.let { viewModel.import("", it) }
+    }
 
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -189,12 +192,7 @@ fun HomeScreen(
                     isLoading = state.isImporting,
                     selectedId = state.selectedProfileId,
                     onServerSelected = viewModel::selectProfile,
-                    onPasteFromClipboard = {
-                        clipboardText(context)?.let {
-                            importInitialValue = it
-                            showImportDialog = true
-                        }
-                    },
+                    onPasteFromClipboard = onPasteFromClipboard,
                     onQrCodeClick = {
                         qrScannerLauncher.launch(QrScannerActivity.createIntent(context))
                     },
@@ -209,10 +207,7 @@ fun HomeScreen(
                     importInitialValue = ""
                     showImportDialog = true
                 },
-                onPasteFromClipboard = {
-                    importInitialValue = clipboardText(context).orEmpty()
-                    showImportDialog = true
-                },
+                onPasteFromClipboard = onPasteFromClipboard,
                 onQrCode = {
                     qrScannerLauncher.launch(QrScannerActivity.createIntent(context))
                 },

@@ -10,6 +10,8 @@ import java.net.URI
 import java.net.URL
 import java.util.Locale
 import java.util.UUID
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -35,6 +37,37 @@ internal fun DownloadedSubscription.validatedBody(): String {
         )
     }
     return body
+}
+
+@OptIn(ExperimentalEncodingApi::class)
+internal fun DownloadedSubscription.profileTitle(): String? {
+    val value = headers.entries
+        .firstOrNull { (name, _) -> name.equals("profile-title", ignoreCase = true) }
+        ?.value
+        ?: body.lineSequence()
+            .take(10)
+            .map(String::trim)
+            .firstOrNull {
+                it.startsWith("#profile-title:", ignoreCase = true) ||
+                    it.startsWith("//profile-title:", ignoreCase = true)
+            }
+            ?.substringAfter(':')
+    val title = value?.trim()?.takeUnless {
+        it.isBlank() || it.equals("NULL", ignoreCase = true)
+    } ?: return null
+    if (!title.startsWith("base64:", ignoreCase = true)) return title
+
+    val encoded = title.substringAfter(':').trim()
+    val padding = "=".repeat((4 - encoded.length % 4) % 4)
+    return sequenceOf(Base64.Default, Base64.UrlSafe)
+        .mapNotNull { decoder ->
+            runCatching {
+                decoder.decode(encoded + padding)
+                    .decodeToString(throwOnInvalidSequence = true)
+                    .trim()
+            }.getOrNull()
+        }
+        .firstOrNull(String::isNotBlank)
 }
 
 class AndroidSubscriptionDownloader(

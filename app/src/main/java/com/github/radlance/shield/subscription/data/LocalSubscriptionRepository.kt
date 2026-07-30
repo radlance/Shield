@@ -58,18 +58,21 @@ class LocalSubscriptionRepository(
     ): Result<Subscription> = runCatching {
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
-        val (sourceUrl, body) = when (source) {
-            is SubscriptionSource.Direct -> null to source.link
+        val (sourceUrl, body, profileTitle) = when (source) {
+            is SubscriptionSource.Direct -> Triple(null, source.link, null)
             is SubscriptionSource.Remote -> {
                 validateSubscriptionUrl(source.url)
-                source.url to downloadSubscription(source.url)
+                val downloaded = downloadSubscription(source.url)
+                Triple(source.url, downloaded.validatedBody(), downloaded.profileTitle())
             }
         }
         val parsed = parser.parseSubscription(body, id)
         requireSupportedProfiles(parsed)
         val subscription = Subscription(
             id = id,
-            name = name.ifBlank { defaultName(sourceUrl, parsed.profiles) },
+            name = name.ifBlank {
+                defaultName(sourceUrl, profileTitle, parsed.profiles)
+            },
             sourceUrl = sourceUrl,
             createdAtEpochMillis = now,
             lastUpdatedAtEpochMillis = now
@@ -90,7 +93,7 @@ class LocalSubscriptionRepository(
             val subscription = current.subscriptions.firstOrNull { it.id == subscriptionId }
                 ?: error("Subscription not found")
             val url = subscription.sourceUrl ?: return@runCatching
-            val content = downloadSubscription(url)
+            val content = downloadSubscription(url).validatedBody()
             val parsed = parser.parseSubscription(content, subscriptionId)
             requireSupportedProfiles(parsed)
             val now = System.currentTimeMillis()
@@ -171,9 +174,8 @@ class LocalSubscriptionRepository(
         }
     }
 
-    private suspend fun downloadSubscription(url: String): String {
-        return downloader.download(url).validatedBody()
-    }
+    private suspend fun downloadSubscription(url: String): DownloadedSubscription =
+        downloader.download(url)
 
     private fun validateSubscriptionUrl(url: String) {
         val uri = URI(url)
@@ -181,9 +183,14 @@ class LocalSubscriptionRepository(
         require(!uri.host.isNullOrBlank()) { "Subscription URL has no host" }
     }
 
-    private fun defaultName(url: String?, profiles: List<VlessProfile>): String =
-        url?.let { runCatching { URI(it).host }.getOrNull() }
+    private fun defaultName(
+        url: String?,
+        profileTitle: String?,
+        profiles: List<VlessProfile>
+    ): String =
+        profileTitle
             ?: profiles.firstOrNull()?.name
+            ?: url?.let { runCatching { URI(it).host }.getOrNull() }
             ?: "Subscription"
 
     private fun requireSupportedProfiles(result: ImportResult) {

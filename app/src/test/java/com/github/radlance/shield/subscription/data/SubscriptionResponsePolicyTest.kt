@@ -42,4 +42,31 @@ class SubscriptionResponsePolicyTest {
 
         assertTrue(failure.exceptionOrNull() is SubscriptionDeviceLimitException)
     }
+
+    @Test
+    fun decodesProfileTitleFromHeader() {
+        val response = DownloadedSubscription(
+            body = "subscription",
+            contentType = "text/plain",
+            headers = mapOf(
+                "Profile-Title" to "base64:SSDinaTvuI8gSGlkZGlmeQ=="
+            )
+        )
+
+        assertEquals("I ❤️ Hiddify", response.profileTitle())
+    }
+
+    @Test
+    fun readsPlainProfileTitleFromBody() {
+        val response = DownloadedSubscription(
+            body = """
+                #profile-title: Shield VPN
+                vless://profile
+            """.trimIndent(),
+            contentType = "text/plain",
+            headers = emptyMap()
+        )
+
+        assertEquals("Shield VPN", response.profileTitle())
+    }
 }
