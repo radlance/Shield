@@ -80,8 +80,10 @@ fun ServerList(
                         selectedId = selectedId,
                         onServerSelected = onServerSelected,
                         onRefresh = group.onRefresh,
+                        onPing = group.onPing,
                         onDelete = group.onDelete,
                         isRefreshing = group.isRefreshing,
+                        isPinging = group.isPinging,
                         error = group.error
                     )
                 }

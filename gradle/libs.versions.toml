@@ -11,6 +11,7 @@ composeBom = "2026.06.01"
 koin = "4.2.2"
 dataStore = "1.2.1"
 kotlinxSerialization = "1.11.0"
+kotlinxCoroutines = "1.9.0"
 androidxNavigation = "2.9.8"
 lottieCompose = "6.7.1"
 material3 = "1.5.0-alpha24"
@@ -26,6 +27,7 @@ lottie-compose = { module = "com.airbnb.android:lottie-compose", version.ref = "
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "androidxNavigation" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "dataStore" }
 androidx-datastore-core = { module = "androidx.datastore:datastore-core", version.ref = "dataStore" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }

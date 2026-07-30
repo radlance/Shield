@@ -8,7 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -16,6 +18,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.shapes
 import androidx.compose.material3.SegmentedListItem
@@ -23,9 +26,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import com.github.radlance.shield.R
 import com.github.radlance.shield.home.presentation.ServerItem
+import com.github.radlance.shield.home.presentation.ServerLatency
 import com.github.radlance.shield.uikit.tokens.icons
+import com.github.radlance.shield.uikit.tokens.spacing
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -58,37 +65,44 @@ fun ServerListItem(
             }
         },
         trailingContent = {
-            AnimatedVisibility(
-                visible = isSelected,
-                enter = scaleIn(
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow
-                    )
-                ) + fadeIn(
-                    animationSpec = spring(stiffness = Spring.StiffnessHigh)
-                ),
-                exit = scaleOut(
-                    animationSpec = spring(stiffness = Spring.StiffnessHigh)
-                ) + fadeOut(
-                    animationSpec = spring(stiffness = Spring.StiffnessHigh)
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(MaterialTheme.icons.medium)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = CircleShape
+                ServerLatencyContent(item.latency)
+
+                AnimatedVisibility(
+                    visible = isSelected,
+                    enter = scaleIn(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
                         )
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(MaterialTheme.icons.small)
+                    ) + fadeIn(
+                        animationSpec = spring(stiffness = Spring.StiffnessHigh)
+                    ),
+                    exit = scaleOut(
+                        animationSpec = spring(stiffness = Spring.StiffnessHigh)
+                    ) + fadeOut(
+                        animationSpec = spring(stiffness = Spring.StiffnessHigh)
                     )
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(MaterialTheme.icons.medium)
+                            .background(
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(MaterialTheme.icons.small)
+                        )
+                    }
                 }
             }
         },
@@ -112,5 +126,42 @@ fun ServerListItem(
         )
     ) {
         Text(item.title)
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ServerLatencyContent(latency: ServerLatency) {
+    when (latency) {
+        ServerLatency.Idle -> Unit
+        ServerLatency.Pinging -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
+            ) {
+                LoadingIndicator(
+                    modifier = Modifier.size(MaterialTheme.icons.mediumSmall)
+                )
+                Text(
+                    text = "...",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        is ServerLatency.Available -> {
+            Text(
+                text = stringResource(R.string.server_latency_ms, latency.milliseconds),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        ServerLatency.Unavailable -> {
+            Text(
+                text = stringResource(R.string.server_latency_unavailable),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

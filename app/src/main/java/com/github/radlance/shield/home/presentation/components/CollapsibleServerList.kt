@@ -22,9 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -43,8 +44,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.github.radlance.shield.R
 import com.github.radlance.shield.home.presentation.ServerItem
 import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
@@ -63,8 +66,10 @@ fun CollapsibleServerList(
     selectedId: String? = null,
     onServerSelected: (String) -> Unit = {},
     onRefresh: (() -> Unit)? = null,
+    onPing: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     isRefreshing: Boolean = false,
+    isPinging: Boolean = false,
     error: String? = null
 ) {
     var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
@@ -165,6 +170,21 @@ fun CollapsibleServerList(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
                 ) {
+                    onPing?.let {
+                        IconButton(
+                            onClick = it,
+                            enabled = items.isNotEmpty() && !isPinging,
+                            shapes = IconButtonDefaults.shapes(),
+                            modifier = Modifier.size(MaterialTheme.icons.large)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Speed,
+                                contentDescription = stringResource(R.string.ping_servers),
+                                modifier = Modifier.size(MaterialTheme.icons.mediumSmall)
+                            )
+                        }
+                    }
+
                     onRefresh?.let {
                         IconButton(
                             onClick = handleRefresh,

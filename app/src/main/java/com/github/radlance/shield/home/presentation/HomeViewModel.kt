@@ -2,25 +2,36 @@ package com.github.radlance.shield.home.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.radlance.shield.subscription.domain.SubscriptionGroup
 import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
+import com.github.radlance.shield.subscription.domain.SubscriptionGroup
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.SubscriptionSource
 import com.github.radlance.shield.subscription.domain.accessStatus
+import com.github.radlance.shield.vpn.domain.ServerLatencyTester
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
 import com.github.radlance.shield.vpn.domain.VpnController
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.supervisorScope
 
 data class HomeUiState(
     val groups: List<SubscriptionGroup> = emptyList(),
     val selectedProfileId: String? = null,
     val connectionState: VpnConnectionState = VpnConnectionState.Disconnected,
     val busySubscriptionIds: Set<String> = emptySet(),
+    val pingingSubscriptionIds: Set<String> = emptySet(),
+    val serverLatencies: Map<String, ServerLatency> = emptyMap(),
     val isImporting: Boolean = false,
     val isInitialized: Boolean = false,
     val message: String? = null
@@ -28,11 +39,16 @@ data class HomeUiState(
 
 class HomeViewModel(
     private val repository: SubscriptionRepository,
-    private val vpnController: VpnController
+    private val vpnController: VpnController,
+    private val latencyTester: ServerLatencyTester
 ) : ViewModel() {
     private val busySubscriptionIds = MutableStateFlow<Set<String>>(emptySet())
     private val importing = MutableStateFlow(false)
     private val message = MutableStateFlow<String?>(null)
+    private val pingingSubscriptionIds = MutableStateFlow<Set<String>>(emptySet())
+    private val serverLatencies = MutableStateFlow<Map<String, ServerLatency>>(emptyMap())
+    private val pingJobs = mutableMapOf<String, Job>()
+    private val pingPermits = Semaphore(MAX_CONCURRENT_PINGS)
 
     private val baseState = combine(
         repository.groups,
@@ -51,7 +67,21 @@ class HomeViewModel(
         )
     }
 
-    val uiState: StateFlow<HomeUiState> = combine(baseState, message) { state, currentMessage ->
+    private val stateWithPings = combine(
+        baseState,
+        pingingSubscriptionIds,
+        serverLatencies
+    ) { state, pingingIds, latencies ->
+        state.copy(
+            pingingSubscriptionIds = pingingIds,
+            serverLatencies = latencies
+        )
+    }
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        stateWithPings,
+        message
+    ) { state, currentMessage ->
         state.copy(message = currentMessage)
     }.stateIn(
         scope = viewModelScope,
@@ -122,9 +152,66 @@ class HomeViewModel(
         }
     }
 
+    fun pingSubscription(subscriptionId: String) {
+        if (pingJobs[subscriptionId]?.isActive == true) return
+        val profiles = uiState.value.groups
+            .firstOrNull { it.subscription.id == subscriptionId }
+            ?.profiles
+            .orEmpty()
+        if (profiles.isEmpty()) return
+
+        val profileIds = profiles.mapTo(linkedSetOf()) { it.id }
+        serverLatencies.update { current ->
+            current + profileIds.associateWith { ServerLatency.Pinging }
+        }
+        pingingSubscriptionIds.update { it + subscriptionId }
+
+        val job = viewModelScope.launch {
+            try {
+                supervisorScope {
+                    profiles.map { profile ->
+                        async {
+                            val latency = pingPermits.withPermit {
+                                try {
+                                    latencyTester.measure(profile)
+                                } catch (error: CancellationException) {
+                                    throw error
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            }
+                            val state = latency
+                                ?.let(ServerLatency::Available)
+                                ?: ServerLatency.Unavailable
+                            serverLatencies.update {
+                                it + (profile.id to state)
+                            }
+                        }
+                    }.awaitAll()
+                }
+            } finally {
+                serverLatencies.update { current ->
+                    current.mapValues { (profileId, state) ->
+                        if (profileId in profileIds && state == ServerLatency.Pinging) {
+                            ServerLatency.Idle
+                        } else {
+                            state
+                        }
+                    }
+                }
+                pingingSubscriptionIds.update { it - subscriptionId }
+                pingJobs.remove(subscriptionId)
+            }
+        }
+        pingJobs[subscriptionId] = job
+    }
+
     fun delete(subscriptionId: String) {
         viewModelScope.launch {
             val group = uiState.value.groups.firstOrNull { it.subscription.id == subscriptionId }
+            pingJobs.remove(subscriptionId)?.cancel()
+            val profileIds = group?.profiles?.mapTo(hashSetOf()) { it.id }.orEmpty()
+            serverLatencies.update { it - profileIds }
             val selectedBelongsToGroup = group?.profiles?.any {
                 it.id == uiState.value.selectedProfileId
             } == true
@@ -165,5 +252,9 @@ class HomeViewModel(
             SubscriptionAccessStatus.TRAFFIC_EXHAUSTED ->
                 "The subscription traffic limit has been reached"
         }
+    }
+
+    private companion object {
+        const val MAX_CONCURRENT_PINGS = 32
     }
 }

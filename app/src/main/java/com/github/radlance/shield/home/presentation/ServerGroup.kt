@@ -10,8 +10,10 @@ data class ServerGroup(
     val metadata: SubscriptionMetadata = SubscriptionMetadata(),
     val accessStatus: SubscriptionAccessStatus = SubscriptionAccessStatus.AVAILABLE,
     val onRefresh: (() -> Unit)? = null,
+    val onPing: (() -> Unit)? = null,
     val onDelete: (() -> Unit)? = null,
     val isRefreshing: Boolean = false,
+    val isPinging: Boolean = false,
     val error: String? = null
 ) {
     val isUnavailable: Boolean

@@ -135,14 +135,17 @@ fun HomeScreen(
                     id = profile.id,
                     leadingIcon = transportIcon(profile.transport),
                     title = profile.name,
-                    description = profileDescription(profile)
+                    description = profileDescription(profile),
+                    latency = state.serverLatencies[profile.id] ?: ServerLatency.Idle
                 )
             },
             onRefresh = group.subscription.sourceUrl?.let {
                 { viewModel.refresh(group.subscription.id) }
             },
+            onPing = { viewModel.pingSubscription(group.subscription.id) },
             onDelete = { viewModel.delete(group.subscription.id) },
             isRefreshing = group.subscription.id in state.busySubscriptionIds,
+            isPinging = group.subscription.id in state.pingingSubscriptionIds,
             error = group.subscription.lastError
         )
     }

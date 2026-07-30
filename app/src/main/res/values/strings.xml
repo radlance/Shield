@@ -31,6 +31,9 @@
     <string name="no_diagnostics">No diagnostic events yet</string>
     <string name="share_logs">Share logs</string>
     <string name="refresh_subscriptions">Refresh subscriptions</string>
+    <string name="ping_servers">Ping servers</string>
+    <string name="server_latency_ms">%1$d ms</string>
+    <string name="server_latency_unavailable">n/a</string>
     <string name="routing">Routing</string>
     <string name="smart_russian_routing">Smart routing for Russian services</string>
     <string name="smart_russian_routing_description">Blocked resources use VPN; Russian domains and networks connect directly</string>
