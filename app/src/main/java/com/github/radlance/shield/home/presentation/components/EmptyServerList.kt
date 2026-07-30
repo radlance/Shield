@@ -16,11 +16,11 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MaterialTheme.shapes
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -73,10 +73,10 @@ fun EmptyServerList(
                 ) {
                     Button(
                         onClick = onPasteFromClipboard,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(MaterialTheme.components.buttonMedium),
-                        shape = shapes.extraLarge
+                            .height(MaterialTheme.components.buttonMedium)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.ContentPaste,
@@ -91,10 +91,10 @@ fun EmptyServerList(
 
                     FilledTonalButton(
                         onClick = onQrCodeClick,
+                        shapes = ButtonDefaults.shapes(),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(MaterialTheme.components.buttonMedium),
-                        shape = shapes.extraLarge
+                            .height(MaterialTheme.components.buttonMedium)
                     ) {
                         Icon(
                             imageVector = Icons.Filled.QrCode,

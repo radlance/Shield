@@ -50,8 +50,11 @@ import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -404,6 +407,7 @@ private enum class QrScannerErrorIcon {
     Unavailable
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun QrScannerScreen(
     uiState: QrScannerUiState,
@@ -455,7 +459,10 @@ private fun QrScannerScreen(
                 .height(64.dp)
                 .padding(horizontal = 8.dp)
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(
+                onClick = onBack,
+                shapes = IconButtonDefaults.shapes()
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.back),
@@ -469,7 +476,10 @@ private fun QrScannerScreen(
             )
             Spacer(modifier = Modifier.weight(1f))
             if (hasFlash) {
-                IconButton(onClick = onToggleTorch) {
+                IconButton(
+                    onClick = onToggleTorch,
+                    shapes = IconButtonDefaults.shapes()
+                ) {
                     Icon(
                         imageVector = if (torchEnabled) {
                             Icons.Filled.FlashOn
@@ -538,7 +548,10 @@ private fun QrScannerScreen(
                             color = MaterialTheme.colorScheme.onSurface,
                             textAlign = TextAlign.Center
                         )
-                        Button(onClick = onAction) {
+                        Button(
+                            onClick = onAction,
+                            shapes = ButtonDefaults.shapes()
+                        ) {
                             Text(stringResource(uiState.actionRes))
                         }
                     }

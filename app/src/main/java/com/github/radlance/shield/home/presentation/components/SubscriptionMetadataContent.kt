@@ -26,6 +26,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MaterialTheme.shapes
@@ -198,7 +199,8 @@ private fun ProviderActions(
     ) {
         webPageUrl?.let { url ->
             FilledTonalIconButton(
-                onClick = { runCatching { uriHandler.openUri(url) } }
+                onClick = { runCatching { uriHandler.openUri(url) } },
+                shapes = IconButtonDefaults.shapes()
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Language,
@@ -209,7 +211,8 @@ private fun ProviderActions(
 
         supportUrl?.let { url ->
             FilledTonalIconButton(
-                onClick = { runCatching { uriHandler.openUri(url) } }
+                onClick = { runCatching { uriHandler.openUri(url) } },
+                shapes = IconButtonDefaults.shapes()
             ) {
                 Icon(
                     imageVector = Icons.Rounded.SupportAgent,

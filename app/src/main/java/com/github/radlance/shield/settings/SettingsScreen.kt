@@ -16,6 +16,8 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -41,6 +43,7 @@ import com.github.radlance.shield.uikit.tokens.spacing
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
     homeViewModel: HomeViewModel,
@@ -63,6 +66,7 @@ fun SettingsScreen(
     ) {
         Button(
             onClick = homeViewModel::refreshAll,
+            shapes = ButtonDefaults.shapes(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Rounded.Refresh, contentDescription = null)
@@ -104,6 +108,7 @@ fun SettingsScreen(
         }
         OutlinedButton(
             onClick = { editingDirectDomains = true },
+            shapes = ButtonDefaults.shapes(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
@@ -115,6 +120,7 @@ fun SettingsScreen(
         }
         OutlinedButton(
             onClick = { editingDirectDomains = false },
+            shapes = ButtonDefaults.shapes(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
@@ -154,6 +160,7 @@ fun SettingsScreen(
                     )
                 )
             },
+            shapes = ButtonDefaults.shapes(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Rounded.Share, contentDescription = null)
@@ -195,6 +202,7 @@ fun SettingsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun DomainOverridesDialog(
     direct: Boolean,
@@ -243,13 +251,17 @@ private fun DomainOverridesDialog(
                             .filter(String::isNotEmpty)
                             .toSet()
                     )
-                }
+                },
+                shapes = ButtonDefaults.shapes()
             ) {
                 Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                shapes = ButtonDefaults.shapes()
+            ) {
                 Text(stringResource(R.string.cancel))
             }
         }
