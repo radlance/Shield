@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
-import android.os.SystemClock
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -150,15 +149,14 @@ fun HomeScreen(
         )
     }
 
-    val isConnected = state.connectionState is VpnConnectionState.Connected
+    val connectedState = state.connectionState as? VpnConnectionState.Connected
+    val isConnected = connectedState != null
     val isTransitioning = state.connectionState is VpnConnectionState.Connecting ||
         state.connectionState is VpnConnectionState.Reconnecting ||
         state.connectionState is VpnConnectionState.Disconnecting
     val selectedSubscriptionAvailable = groups
         .firstOrNull { group -> group.items.any { it.id == state.selectedProfileId } }
         ?.accessStatus == SubscriptionAccessStatus.AVAILABLE
-    val elapsed = rememberElapsedText(state.connectionState)
-
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -175,7 +173,7 @@ fun HomeScreen(
                         isConnected ||
                             state.selectedProfileId != null && selectedSubscriptionAvailable
                         ),
-                    statusText = elapsed,
+                    connectedAtElapsedRealtime = connectedState?.connectedAtElapsedRealtime,
                     onStartStop = {
                         if (isConnected) {
                             viewModel.disconnect()
@@ -308,22 +306,6 @@ private fun ImportDialog(
             }
         }
     )
-}
-
-@Composable
-private fun rememberElapsedText(connectionState: VpnConnectionState): String {
-    val connected = connectionState as? VpnConnectionState.Connected ?: return "00:00:00"
-    var elapsedSeconds by remember(connected.connectedAtElapsedRealtime) { mutableLongStateOf(0L) }
-    LaunchedEffect(connected.connectedAtElapsedRealtime) {
-        while (true) {
-            elapsedSeconds = (SystemClock.elapsedRealtime() - connected.connectedAtElapsedRealtime) / 1_000
-            delay(1_000.milliseconds)
-        }
-    }
-    val hours = elapsedSeconds / 3_600
-    val minutes = elapsedSeconds % 3_600 / 60
-    val seconds = elapsedSeconds % 60
-    return "%02d:%02d:%02d".format(hours, minutes, seconds)
 }
 
 @Composable

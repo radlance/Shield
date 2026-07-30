@@ -53,7 +53,7 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.Shield"
-            tools:ignore="LockedOrientationActivity" />
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
 
         <service
             android:name=".vpn.ShieldVpnService"

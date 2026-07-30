@@ -1,21 +1,11 @@
 package com.github.radlance.shield.home.presentation
 
+import android.os.SystemClock
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.IconToggleButtonShapes
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -25,11 +15,28 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.material3.FilledIconToggleButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButtonShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -38,6 +45,8 @@ import com.github.radlance.shield.uikit.tokens.components
 import com.github.radlance.shield.uikit.tokens.corners
 import com.github.radlance.shield.uikit.tokens.icons
 import com.github.radlance.shield.uikit.vector.ModeOffOnIcon
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun ShieldControlBar(
@@ -45,7 +54,7 @@ fun ShieldControlBar(
     onStartStop: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    statusText: String = "00:00:00"
+    connectedAtElapsedRealtime: Long? = null
 ) {
     val containerColor by animateColorAsState(
         targetValue = when {
@@ -145,18 +154,54 @@ fun ShieldControlBar(
                     .align(Alignment.Center)
                     .offset(x = 32.dp)
             ) {
-                BasicText(
-                    text = statusText,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = contentColor
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 14.sp),
-                    modifier = Modifier.widthIn(max = 128.dp)
+                ElapsedTimerText(
+                    connectedAtElapsedRealtime = connectedAtElapsedRealtime,
+                    contentColor = contentColor
                 )
             }
         }
     }
+}
+
+@Composable
+private fun ElapsedTimerText(
+    connectedAtElapsedRealtime: Long?,
+    contentColor: Color
+) {
+    var elapsedSeconds by remember(connectedAtElapsedRealtime) {
+        mutableLongStateOf(0L)
+    }
+    val autoSize = remember {
+        TextAutoSize.StepBased(
+            minFontSize = 14.sp,
+            maxFontSize = 24.sp,
+            stepSize = 1.sp
+        )
+    }
+
+    LaunchedEffect(connectedAtElapsedRealtime) {
+        val connectedAt = connectedAtElapsedRealtime ?: return@LaunchedEffect
+        while (true) {
+            val elapsedMillis = (SystemClock.elapsedRealtime() - connectedAt).coerceAtLeast(0L)
+            elapsedSeconds = elapsedMillis / 1_000
+            delay((1_000 - elapsedMillis % 1_000).milliseconds)
+        }
+    }
+
+    val hours = elapsedSeconds / 3_600
+    val minutes = elapsedSeconds % 3_600 / 60
+    val seconds = elapsedSeconds % 60
+    BasicText(
+        text = "%02d:%02d:%02d".format(hours, minutes, seconds),
+        style = MaterialTheme.typography.headlineMedium.copy(
+            fontWeight = FontWeight.Bold,
+            color = contentColor,
+            fontFeatureSettings = "tnum",
+            textAlign = TextAlign.Center
+        ),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        autoSize = autoSize,
+        modifier = Modifier.width(128.dp)
+    )
 }
