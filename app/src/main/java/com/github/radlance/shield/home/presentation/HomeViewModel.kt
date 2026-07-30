@@ -3,8 +3,10 @@ package com.github.radlance.shield.home.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.radlance.shield.subscription.domain.SubscriptionGroup
+import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.SubscriptionSource
+import com.github.radlance.shield.subscription.domain.accessStatus
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
 import com.github.radlance.shield.vpn.domain.VpnController
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,6 +77,10 @@ class HomeViewModel(
 
     fun selectProfile(profileId: String) {
         val state = uiState.value
+        unavailableMessage(profileId, state.groups)?.let {
+            message.value = it
+            return
+        }
         val connection = state.connectionState
         if (
             connection is VpnConnectionState.Connected ||
@@ -131,11 +137,33 @@ class HomeViewModel(
 
     fun connectSelected() {
         val id = uiState.value.selectedProfileId ?: return
+        unavailableMessage(id, uiState.value.groups)?.let {
+            message.value = it
+            return
+        }
         vpnController.connect(id)
     }
 
     fun disconnect() = vpnController.disconnect()
     fun dismissMessage() {
         message.value = null
+    }
+
+    private fun unavailableMessage(
+        profileId: String,
+        groups: List<SubscriptionGroup>
+    ): String? {
+        val subscription = groups
+            .firstOrNull { group -> group.profiles.any { it.id == profileId } }
+            ?.subscription
+            ?: return null
+        return when (
+            subscription.metadata.accessStatus(System.currentTimeMillis() / 1_000)
+        ) {
+            SubscriptionAccessStatus.AVAILABLE -> null
+            SubscriptionAccessStatus.EXPIRED -> "The subscription has expired"
+            SubscriptionAccessStatus.TRAFFIC_EXHAUSTED ->
+                "The subscription traffic limit has been reached"
+        }
     }
 }

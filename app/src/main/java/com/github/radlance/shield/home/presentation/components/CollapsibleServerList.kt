@@ -43,7 +43,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import com.github.radlance.shield.home.presentation.ServerItem
+import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
+import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
 import com.github.radlance.shield.uikit.tokens.icons
 import com.github.radlance.shield.uikit.tokens.spacing
 
@@ -53,6 +56,8 @@ fun CollapsibleServerList(
     title: String,
     items: List<ServerItem>,
     modifier: Modifier = Modifier,
+    metadata: SubscriptionMetadata = SubscriptionMetadata(),
+    accessStatus: SubscriptionAccessStatus = SubscriptionAccessStatus.AVAILABLE,
     isInitiallyExpanded: Boolean = true,
     selectedId: String? = null,
     onServerSelected: (String) -> Unit = {},
@@ -62,6 +67,8 @@ fun CollapsibleServerList(
     error: String? = null
 ) {
     var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
+    val summary = subscriptionSummary(metadata)
+    val hasMetadata = metadata.hasVisibleData()
 
     val rotationAngle by animateFloatAsState(
         targetValue = if (isExpanded) 180f else 0f,
@@ -97,29 +104,58 @@ fun CollapsibleServerList(
                         vertical = MaterialTheme.spacing.s
                     )
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s)
                     ) {
                         Text(
-                            text = items.size.toString(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(
-                                horizontal = MaterialTheme.spacing.s,
-                                vertical = MaterialTheme.spacing.xxs
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = items.size.toString(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(
+                                    horizontal = MaterialTheme.spacing.s,
+                                    vertical = MaterialTheme.spacing.xxs
+                                )
                             )
+                        }
+                    }
+
+                    summary?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = when (accessStatus) {
+                                SubscriptionAccessStatus.AVAILABLE -> {
+                                    if (metadata.needsAttention()) {
+                                        MaterialTheme.colorScheme.tertiary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                }
+                                SubscriptionAccessStatus.EXPIRED,
+                                SubscriptionAccessStatus.TRAFFIC_EXHAUSTED ->
+                                    MaterialTheme.colorScheme.error
+                            },
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -233,13 +269,21 @@ fun CollapsibleServerList(
                     .padding(top = MaterialTheme.spacing.xs),
                 verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
             ) {
+                if (hasMetadata) {
+                    SubscriptionMetadataContent(
+                        metadata = metadata,
+                        accessStatus = accessStatus
+                    )
+                }
+
                 items.forEachIndexed { index, item ->
                     ServerListItem(
                         item = item,
                         isSelected = item.id == selectedId,
                         index = index,
                         totalItems = items.size,
-                        onSelect = { onServerSelected(item.id) }
+                        onSelect = { onServerSelected(item.id) },
+                        enabled = accessStatus == SubscriptionAccessStatus.AVAILABLE
                     )
                 }
             }

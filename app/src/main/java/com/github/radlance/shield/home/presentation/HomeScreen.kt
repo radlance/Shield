@@ -47,9 +47,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.radlance.shield.R
 import com.github.radlance.shield.qr.QrScannerActivity
+import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
+import com.github.radlance.shield.subscription.domain.accessStatus
 import com.github.radlance.shield.subscription.presentation.ImportIntentBus
 import com.github.radlance.shield.uikit.tokens.spacing
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
@@ -119,10 +121,13 @@ fun HomeScreen(
         }
     }
 
+    val nowEpochSeconds = rememberCurrentEpochSeconds()
     val groups = state.groups.map { group ->
         ServerGroup(
             id = group.subscription.id,
             title = group.subscription.name,
+            metadata = group.subscription.metadata,
+            accessStatus = group.subscription.metadata.accessStatus(nowEpochSeconds),
             items = group.profiles.map { profile ->
                 ServerItem(
                     id = profile.id,
@@ -144,6 +149,9 @@ fun HomeScreen(
     val isTransitioning = state.connectionState is VpnConnectionState.Connecting ||
         state.connectionState is VpnConnectionState.Reconnecting ||
         state.connectionState is VpnConnectionState.Disconnecting
+    val selectedSubscriptionAvailable = groups
+        .firstOrNull { group -> group.items.any { it.id == state.selectedProfileId } }
+        ?.accessStatus == SubscriptionAccessStatus.AVAILABLE
     val elapsed = rememberElapsedText(state.connectionState)
 
     Surface(
@@ -158,7 +166,10 @@ fun HomeScreen(
             ) {
                 ShieldControlBar(
                     isWorking = isConnected,
-                    enabled = state.selectedProfileId != null && !isTransitioning,
+                    enabled = !isTransitioning && (
+                        isConnected ||
+                            state.selectedProfileId != null && selectedSubscriptionAvailable
+                        ),
                     statusText = elapsed,
                     onStartStop = {
                         if (isConnected) {
@@ -385,4 +396,16 @@ private fun profileDescription(profile: VlessProfile): String =
 private fun clipboardText(context: Context): String? {
     val clipboard = context.getSystemService(ClipboardManager::class.java)
     return clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()
+}
+
+@Composable
+private fun rememberCurrentEpochSeconds(): Long {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis() / 1_000) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000.milliseconds)
+            now = System.currentTimeMillis() / 1_000
+        }
+    }
+    return now
 }

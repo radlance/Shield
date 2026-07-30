@@ -75,6 +75,8 @@ fun ServerList(
                     CollapsibleServerList(
                         title = group.title,
                         items = group.items,
+                        metadata = group.metadata,
+                        accessStatus = group.accessStatus,
                         selectedId = selectedId,
                         onServerSelected = onServerSelected,
                         onRefresh = group.onRefresh,

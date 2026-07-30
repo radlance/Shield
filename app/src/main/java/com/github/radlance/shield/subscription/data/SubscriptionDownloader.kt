@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.core.content.edit
 import com.github.radlance.shield.BuildConfig
 import com.github.radlance.shield.subscription.domain.SubscriptionDeviceLimitException
+import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
@@ -41,23 +42,68 @@ internal fun DownloadedSubscription.validatedBody(): String {
 
 @OptIn(ExperimentalEncodingApi::class)
 internal fun DownloadedSubscription.profileTitle(): String? {
-    val value = headers.entries
-        .firstOrNull { (name, _) -> name.equals("profile-title", ignoreCase = true) }
-        ?.value
-        ?: body.lineSequence()
-            .take(10)
-            .map(String::trim)
-            .firstOrNull {
-                it.startsWith("#profile-title:", ignoreCase = true) ||
-                    it.startsWith("//profile-title:", ignoreCase = true)
-            }
-            ?.substringAfter(':')
-    val title = value?.trim()?.takeUnless {
-        it.isBlank() || it.equals("NULL", ignoreCase = true)
-    } ?: return null
-    if (!title.startsWith("base64:", ignoreCase = true)) return title
+    return metadataValue("profile-title")?.decodeMetadataText()
+}
 
-    val encoded = title.substringAfter(':').trim()
+internal fun DownloadedSubscription.metadata(): SubscriptionMetadata {
+    val userInfo = metadataValue("subscription-userinfo")
+        ?.split(';')
+        ?.mapNotNull { part ->
+            val separator = part.indexOf('=')
+            if (separator <= 0) return@mapNotNull null
+            part.substring(0, separator).trim().lowercase(Locale.ROOT) to
+                part.substring(separator + 1).trim()
+        }
+        ?.toMap()
+        .orEmpty()
+
+    return SubscriptionMetadata(
+        uploadBytes = userInfo.nonNegativeLong("upload"),
+        downloadBytes = userInfo.nonNegativeLong("download"),
+        totalBytes = userInfo.nonNegativeLong("total"),
+        expiresAtEpochSeconds = userInfo.nonNegativeLong("expire")
+            ?.takeIf { it <= Long.MAX_VALUE / 1_000 },
+        announcement = metadataValue("announce")
+            ?.decodeMetadataText()
+            ?.take(MAX_ANNOUNCEMENT_LENGTH),
+        supportUrl = metadataValue("support-url")?.safeExternalUrl(),
+        webPageUrl = metadataValue("profile-web-page-url")?.safeExternalUrl(),
+        updateIntervalHours = metadataValue("profile-update-interval")
+            ?.toIntOrNull()
+            ?.takeIf { it > 0 }
+    )
+}
+
+private fun DownloadedSubscription.metadataValue(name: String): String? {
+    val headerValue = headers.entries
+        .firstOrNull { (headerName, _) -> headerName.equals(name, ignoreCase = true) }
+        ?.value
+    val bodyValue = body.lineSequence()
+        .take(10)
+        .map(String::trim)
+        .mapNotNull { line ->
+            val content = when {
+                line.startsWith("//") -> line.substring(2)
+                line.startsWith("#") -> line.substring(1)
+                else -> return@mapNotNull null
+            }.trim()
+            val separator = content.indexOf(':')
+            if (separator <= 0) return@mapNotNull null
+            val fieldName = content.substring(0, separator).trim()
+            if (!fieldName.equals(name, ignoreCase = true)) return@mapNotNull null
+            content.substring(separator + 1)
+        }
+        .firstOrNull()
+    return (headerValue ?: bodyValue)
+        ?.trim()
+        ?.takeUnless { it.isBlank() || it.equals("NULL", ignoreCase = true) }
+}
+
+@OptIn(ExperimentalEncodingApi::class)
+private fun String.decodeMetadataText(): String? {
+    if (!startsWith("base64:", ignoreCase = true)) return trim().takeIf(String::isNotBlank)
+    val encoded = substringAfter(':').trim()
+    if (encoded.isBlank()) return null
     val padding = "=".repeat((4 - encoded.length % 4) % 4)
     return sequenceOf(Base64.Default, Base64.UrlSafe)
         .mapNotNull { decoder ->
@@ -69,6 +115,19 @@ internal fun DownloadedSubscription.profileTitle(): String? {
         }
         .firstOrNull(String::isNotBlank)
 }
+
+private fun Map<String, String>.nonNegativeLong(name: String): Long? =
+    get(name)?.toLongOrNull()?.takeIf { it >= 0 }
+
+private fun String.safeExternalUrl(): String? = runCatching {
+    val value = trim()
+    val uri = URI(value)
+    when (uri.scheme?.lowercase(Locale.ROOT)) {
+        "http", "https" -> value.takeIf { !uri.host.isNullOrBlank() }
+        "tg" -> value.takeIf { uri.schemeSpecificPart.isNotBlank() }
+        else -> null
+    }
+}.getOrNull()
 
 class AndroidSubscriptionDownloader(
     context: Context
@@ -148,3 +207,5 @@ class AndroidSubscriptionDownloader(
 
 private fun Map<String, String>.isEnabled(name: String): Boolean =
     get(name)?.trim()?.equals("true", ignoreCase = true) == true
+
+private const val MAX_ANNOUNCEMENT_LENGTH = 4_096

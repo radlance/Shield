@@ -35,11 +35,13 @@ fun ServerListItem(
     index: Int,
     totalItems: Int,
     onSelect: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     SegmentedListItem(
         modifier = modifier,
         selected = isSelected,
+        enabled = enabled,
         leadingContent = {
             Text(
                 text = item.leadingIcon,
@@ -90,7 +92,9 @@ fun ServerListItem(
                 }
             }
         },
-        onClick = onSelect,
+        onClick = {
+            if (enabled) onSelect()
+        },
         shapes = ListItemDefaults.segmentedShapes(
             index,
             totalItems,

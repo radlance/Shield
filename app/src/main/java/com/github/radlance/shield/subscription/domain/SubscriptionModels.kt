@@ -9,8 +9,47 @@ data class Subscription(
     val sourceUrl: String? = null,
     val createdAtEpochMillis: Long,
     val lastUpdatedAtEpochMillis: Long? = null,
-    val lastError: String? = null
+    val lastError: String? = null,
+    val metadata: SubscriptionMetadata = SubscriptionMetadata()
 )
+
+@Serializable
+data class SubscriptionMetadata(
+    val uploadBytes: Long? = null,
+    val downloadBytes: Long? = null,
+    val totalBytes: Long? = null,
+    val expiresAtEpochSeconds: Long? = null,
+    val announcement: String? = null,
+    val supportUrl: String? = null,
+    val webPageUrl: String? = null,
+    val updateIntervalHours: Int? = null
+) {
+    val usedBytes: Long?
+        get() {
+            val values = listOfNotNull(uploadBytes, downloadBytes)
+            if (values.isEmpty()) return null
+            return values.fold(0L) { total, value ->
+                if (Long.MAX_VALUE - total < value) Long.MAX_VALUE else total + value
+            }
+        }
+}
+
+enum class SubscriptionAccessStatus {
+    AVAILABLE,
+    EXPIRED,
+    TRAFFIC_EXHAUSTED
+}
+
+fun SubscriptionMetadata.accessStatus(nowEpochSeconds: Long): SubscriptionAccessStatus {
+    if (expiresAtEpochSeconds?.let { nowEpochSeconds >= it } == true) {
+        return SubscriptionAccessStatus.EXPIRED
+    }
+    val used = usedBytes
+    if (totalBytes?.let { it > 0 && used != null && used >= it } == true) {
+        return SubscriptionAccessStatus.TRAFFIC_EXHAUSTED
+    }
+    return SubscriptionAccessStatus.AVAILABLE
+}
 
 @Serializable
 data class VlessProfile(

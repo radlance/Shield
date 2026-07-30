@@ -7,10 +7,13 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.github.radlance.shield.subscription.domain.ImportResult
 import com.github.radlance.shield.subscription.domain.ProfileParser
 import com.github.radlance.shield.subscription.domain.Subscription
+import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.SubscriptionGroup
+import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.SubscriptionSource
 import com.github.radlance.shield.subscription.domain.VlessProfile
+import com.github.radlance.shield.subscription.domain.accessStatus
 import java.net.URI
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -58,30 +61,41 @@ class LocalSubscriptionRepository(
     ): Result<Subscription> = runCatching {
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
-        val (sourceUrl, body, profileTitle) = when (source) {
-            is SubscriptionSource.Direct -> Triple(null, source.link, null)
+        val payload = when (source) {
+            is SubscriptionSource.Direct -> ImportPayload(body = source.link)
             is SubscriptionSource.Remote -> {
                 validateSubscriptionUrl(source.url)
                 val downloaded = downloadSubscription(source.url)
-                Triple(source.url, downloaded.validatedBody(), downloaded.profileTitle())
+                ImportPayload(
+                    sourceUrl = source.url,
+                    body = downloaded.validatedBody(),
+                    profileTitle = downloaded.profileTitle(),
+                    metadata = downloaded.metadata()
+                )
             }
         }
-        val parsed = parser.parseSubscription(body, id)
-        requireSupportedProfiles(parsed)
+        val parsed = parser.parseSubscription(payload.body, id)
+        if (
+            parsed.profiles.isEmpty() &&
+            payload.metadata.accessStatus(now / 1_000) == SubscriptionAccessStatus.AVAILABLE
+        ) {
+            requireSupportedProfiles(parsed)
+        }
         val subscription = Subscription(
             id = id,
             name = name.ifBlank {
-                defaultName(sourceUrl, profileTitle, parsed.profiles)
+                defaultName(payload.sourceUrl, payload.profileTitle, parsed.profiles)
             },
-            sourceUrl = sourceUrl,
+            sourceUrl = payload.sourceUrl,
             createdAtEpochMillis = now,
-            lastUpdatedAtEpochMillis = now
+            lastUpdatedAtEpochMillis = now,
+            metadata = payload.metadata
         )
         mutate { current ->
             current.copy(
                 subscriptions = current.subscriptions + subscription,
                 profiles = current.profiles + parsed.profiles,
-                selectedProfileId = current.selectedProfileId ?: parsed.profiles.first().id
+                selectedProfileId = current.selectedProfileId ?: parsed.profiles.firstOrNull()?.id
             )
         }
         subscription
@@ -93,28 +107,44 @@ class LocalSubscriptionRepository(
             val subscription = current.subscriptions.firstOrNull { it.id == subscriptionId }
                 ?: error("Subscription not found")
             val url = subscription.sourceUrl ?: return@runCatching
-            val content = downloadSubscription(url).validatedBody()
+            val downloaded = downloadSubscription(url)
+            val content = downloaded.validatedBody()
+            val metadata = downloaded.metadata()
             val parsed = parser.parseSubscription(content, subscriptionId)
-            requireSupportedProfiles(parsed)
             val now = System.currentTimeMillis()
+            val keepCachedProfiles =
+                parsed.profiles.isEmpty() &&
+                    metadata.accessStatus(now / 1_000) != SubscriptionAccessStatus.AVAILABLE
+            if (parsed.profiles.isEmpty() && !keepCachedProfiles) {
+                requireSupportedProfiles(parsed)
+            }
             mutate { latest ->
+                val refreshedProfiles = if (keepCachedProfiles) {
+                    latest.profiles.filter { it.subscriptionId == subscriptionId }
+                } else {
+                    parsed.profiles
+                }
                 val otherProfiles = latest.profiles.filterNot { it.subscriptionId == subscriptionId }
                 val selected = latest.selectedProfileId
                 val nextSelection = when {
-                    selected == null -> parsed.profiles.first().id
-                    parsed.profiles.any { it.id == selected } -> selected
+                    selected == null -> refreshedProfiles.firstOrNull()?.id
+                    refreshedProfiles.any { it.id == selected } -> selected
                     latest.profiles.any { it.id == selected && it.subscriptionId != subscriptionId } -> selected
-                    else -> parsed.profiles.first().id
+                    else -> refreshedProfiles.firstOrNull()?.id
                 }
                 latest.copy(
                     subscriptions = latest.subscriptions.map {
                         if (it.id == subscriptionId) {
-                            it.copy(lastUpdatedAtEpochMillis = now, lastError = null)
+                            it.copy(
+                                lastUpdatedAtEpochMillis = now,
+                                lastError = null,
+                                metadata = metadata
+                            )
                         } else {
                             it
                         }
                     },
-                    profiles = otherProfiles + parsed.profiles,
+                    profiles = otherProfiles + refreshedProfiles,
                     selectedProfileId = nextSelection
                 )
             }
@@ -220,4 +250,11 @@ class LocalSubscriptionRepository(
     private companion object {
         val STATE_KEY = stringPreferencesKey("encrypted_state_v1")
     }
+
+    private data class ImportPayload(
+        val sourceUrl: String? = null,
+        val body: String,
+        val profileTitle: String? = null,
+        val metadata: SubscriptionMetadata = SubscriptionMetadata()
+    )
 }
