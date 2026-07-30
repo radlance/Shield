@@ -3,8 +3,10 @@ package com.github.radlance.shield.di
 import com.github.radlance.shield.diagnostics.DiagnosticLog
 import com.github.radlance.shield.home.presentation.HomeViewModel
 import com.github.radlance.shield.subscription.data.AndroidSecretCipher
+import com.github.radlance.shield.subscription.data.AndroidSubscriptionDownloader
 import com.github.radlance.shield.subscription.data.LocalSubscriptionRepository
 import com.github.radlance.shield.subscription.data.SecretCipher
+import com.github.radlance.shield.subscription.data.SubscriptionDownloader
 import com.github.radlance.shield.subscription.data.VlessProfileParser
 import com.github.radlance.shield.subscription.domain.ProfileParser
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
@@ -21,11 +23,13 @@ import org.koin.dsl.module
 val vpnModule = module {
     single<ProfileParser> { VlessProfileParser() }
     single<SecretCipher> { AndroidSecretCipher() }
+    single<SubscriptionDownloader> { AndroidSubscriptionDownloader(androidContext()) }
     single<SubscriptionRepository> {
         LocalSubscriptionRepository(
             context = androidContext(),
             parser = get(),
-            cipher = get()
+            cipher = get(),
+            downloader = get()
         )
     }
     single { SingBoxConfigGenerator() }

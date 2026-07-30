@@ -10,17 +10,13 @@ import com.github.radlance.shield.subscription.domain.SubscriptionGroup
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.SubscriptionSource
 import com.github.radlance.shield.subscription.domain.VlessProfile
-import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
 import java.util.UUID
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -29,7 +25,8 @@ private val Context.subscriptionStore by preferencesDataStore(name = "subscripti
 class LocalSubscriptionRepository(
     private val context: Context,
     private val parser: ProfileParser,
-    private val cipher: SecretCipher
+    private val cipher: SecretCipher,
+    private val downloader: SubscriptionDownloader
 ) : SubscriptionRepository {
     private val mutex = Mutex()
     private val json = Json {
@@ -64,11 +61,11 @@ class LocalSubscriptionRepository(
             is SubscriptionSource.Direct -> null to source.link
             is SubscriptionSource.Remote -> {
                 validateSubscriptionUrl(source.url)
-                source.url to download(source.url)
+                source.url to downloadSubscription(source.url)
             }
         }
         val parsed = parser.parseSubscription(body, id)
-        require(parsed.profiles.isNotEmpty()) { "No supported VLESS profiles were found" }
+        requireSupportedProfiles(parsed)
         val subscription = Subscription(
             id = id,
             name = name.ifBlank { defaultName(sourceUrl, parsed.profiles) },
@@ -92,9 +89,9 @@ class LocalSubscriptionRepository(
             val subscription = current.subscriptions.firstOrNull { it.id == subscriptionId }
                 ?: error("Subscription not found")
             val url = subscription.sourceUrl ?: return@runCatching
-            val content = download(url)
+            val content = downloadSubscription(url)
             val parsed = parser.parseSubscription(content, subscriptionId)
-            require(parsed.profiles.isNotEmpty()) { "Subscription contains no supported VLESS profiles" }
+            requireSupportedProfiles(parsed)
             val now = System.currentTimeMillis()
             mutate { latest ->
                 val otherProfiles = latest.profiles.filterNot { it.subscriptionId == subscriptionId }
@@ -173,24 +170,8 @@ class LocalSubscriptionRepository(
         }
     }
 
-    private suspend fun download(url: String): String = withContext(Dispatchers.IO) {
-        validateSubscriptionUrl(url)
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.instanceFollowRedirects = true
-            connection.connectTimeout = CONNECT_TIMEOUT_MILLIS
-            connection.readTimeout = READ_TIMEOUT_MILLIS
-            connection.setRequestProperty("User-Agent", "Shield/1.0 sing-box")
-            connection.setRequestProperty("Accept", "text/plain, application/octet-stream")
-            val status = connection.responseCode
-            require(status in 200..299) { "Subscription server returned HTTP $status" }
-            require(connection.url.protocol.equals("https", ignoreCase = true)) {
-                "Subscription redirect must remain on HTTPS"
-            }
-            connection.inputStream.bufferedReader().use { it.readText() }
-        } finally {
-            connection.disconnect()
-        }
+    private suspend fun downloadSubscription(url: String): String {
+        return downloader.download(url).validatedBody()
     }
 
     private fun validateSubscriptionUrl(url: String) {
@@ -203,6 +184,17 @@ class LocalSubscriptionRepository(
         url?.let { runCatching { URI(it).host }.getOrNull() }
             ?: profiles.firstOrNull()?.name
             ?: "Subscription"
+
+    private fun requireSupportedProfiles(result: com.github.radlance.shield.subscription.domain.ImportResult) {
+        if (result.profiles.isNotEmpty()) return
+        if (result.unsupportedTransports.isNotEmpty()) {
+            val transports = result.unsupportedTransports.sorted().joinToString()
+            throw IllegalArgumentException(
+                "The subscription only contains unsupported VLESS transports: $transports"
+            )
+        }
+        throw IllegalArgumentException("No supported VLESS profiles were found")
+    }
 
     private fun encode(state: StoredState): String =
         cipher.encrypt(json.encodeToString(StoredState.serializer(), state))
@@ -219,7 +211,5 @@ class LocalSubscriptionRepository(
 
     private companion object {
         val STATE_KEY = stringPreferencesKey("encrypted_state_v1")
-        const val CONNECT_TIMEOUT_MILLIS = 15_000
-        const val READ_TIMEOUT_MILLIS = 30_000
     }
 }

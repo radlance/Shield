@@ -55,7 +55,8 @@ data class SubscriptionGroup(
 
 data class ImportResult(
     val profiles: List<VlessProfile>,
-    val rejectedEntries: Int
+    val rejectedEntries: Int,
+    val unsupportedTransports: Set<String> = emptySet()
 )
 
 sealed interface SubscriptionSource {
