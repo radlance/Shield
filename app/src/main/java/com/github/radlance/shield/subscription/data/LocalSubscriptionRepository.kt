@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.github.radlance.shield.subscription.domain.ImportResult
 import com.github.radlance.shield.subscription.domain.ProfileParser
 import com.github.radlance.shield.subscription.domain.Subscription
 import com.github.radlance.shield.subscription.domain.SubscriptionGroup
@@ -185,7 +186,7 @@ class LocalSubscriptionRepository(
             ?: profiles.firstOrNull()?.name
             ?: "Subscription"
 
-    private fun requireSupportedProfiles(result: com.github.radlance.shield.subscription.domain.ImportResult) {
+    private fun requireSupportedProfiles(result: ImportResult) {
         if (result.profiles.isNotEmpty()) return
         if (result.unsupportedTransports.isNotEmpty()) {
             val transports = result.unsupportedTransports.sorted().joinToString()

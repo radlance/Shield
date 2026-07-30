@@ -44,7 +44,6 @@ class DataStoreRoutingSettingsRepository(
     }
 
     private companion object {
-        // Keep the original boolean key so existing installations retain their preference.
         val SMART_RUSSIAN_ROUTING = booleanPreferencesKey("russian_services_direct")
         val FORCE_DIRECT_DOMAINS = stringSetPreferencesKey("force_direct_domains")
         val FORCE_PROXY_DOMAINS = stringSetPreferencesKey("force_proxy_domains")

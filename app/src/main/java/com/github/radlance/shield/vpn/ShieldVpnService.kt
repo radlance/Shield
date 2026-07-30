@@ -1,11 +1,13 @@
 package com.github.radlance.shield.vpn
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
+import android.net.IpPrefix
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -17,10 +19,9 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.system.OsConstants
-import android.Manifest
-import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.github.radlance.shield.R
 import com.github.radlance.shield.core.MainActivity
 import com.github.radlance.shield.diagnostics.DiagnosticLog
@@ -42,14 +43,13 @@ import io.nekohasekai.libbox.NetworkInterfaceIterator
 import io.nekohasekai.libbox.Notification
 import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.PlatformInterface
+import io.nekohasekai.libbox.RoutePrefixIterator
 import io.nekohasekai.libbox.StringIterator
 import io.nekohasekai.libbox.SystemProxyStatus
 import io.nekohasekai.libbox.TunOptions
 import io.nekohasekai.libbox.WIFIState
-import java.net.Inet6Address
-import java.net.NetworkInterface
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -60,6 +60,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
+import java.net.InetAddress
+import java.net.NetworkInterface
+import android.app.Notification as AndroidNotification
+import io.nekohasekai.libbox.NetworkInterface as LibboxNetworkInterface
 
 class ShieldVpnService :
     VpnService(),
@@ -280,7 +284,7 @@ class ShieldVpnService :
             }
     }
 
-    private fun buildServiceNotification(content: String): android.app.Notification {
+    private fun buildServiceNotification(content: String): AndroidNotification {
         val openIntent = PendingIntent.getActivity(
             this,
             0,
@@ -342,7 +346,7 @@ class ShieldVpnService :
 
     override fun getInterfaces(): NetworkInterfaceIterator {
         val interfaces = NetworkInterface.getNetworkInterfaces().toList().map { networkInterface ->
-            io.nekohasekai.libbox.NetworkInterface().apply {
+            LibboxNetworkInterface().apply {
                 index = networkInterface.index
                 name = networkInterface.name
                 mtu = runCatching { networkInterface.mtu }.getOrDefault(1500)
@@ -518,7 +522,7 @@ class ShieldVpnService :
 
     private fun addAddresses(
         builder: Builder,
-        iterator: io.nekohasekai.libbox.RoutePrefixIterator
+        iterator: RoutePrefixIterator
     ): Boolean {
         var added = false
         while (iterator.hasNext()) {
@@ -531,7 +535,7 @@ class ShieldVpnService :
 
     private fun addRoutes(
         builder: Builder,
-        iterator: io.nekohasekai.libbox.RoutePrefixIterator
+        iterator: RoutePrefixIterator
     ): Boolean {
         var added = false
         while (iterator.hasNext()) {
@@ -542,11 +546,13 @@ class ShieldVpnService :
         return added
     }
 
-    private fun addExcludedRoutes(builder: Builder, iterator: io.nekohasekai.libbox.RoutePrefixIterator) {
+    private fun addExcludedRoutes(builder: Builder, iterator: RoutePrefixIterator) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         while (iterator.hasNext()) {
             val prefix = iterator.next()
-            builder.excludeRoute(android.net.IpPrefix(java.net.InetAddress.getByName(prefix.address()), prefix.prefix()))
+            builder.excludeRoute(
+                IpPrefix(InetAddress.getByName(prefix.address()), prefix.prefix())
+            )
         }
     }
 
@@ -565,11 +571,11 @@ class ShieldVpnService :
     }
 
     private class NetworkInterfaceList(
-        interfaces: List<io.nekohasekai.libbox.NetworkInterface>
+        interfaces: List<LibboxNetworkInterface>
     ) : NetworkInterfaceIterator {
         private val iterator = interfaces.iterator()
         override fun hasNext(): Boolean = iterator.hasNext()
-        override fun next(): io.nekohasekai.libbox.NetworkInterface = iterator.next()
+        override fun next(): LibboxNetworkInterface = iterator.next()
     }
 
     companion object {

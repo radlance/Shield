@@ -1,11 +1,10 @@
 package com.github.radlance.shield.qr
 
 import android.Manifest
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Color
+import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -16,6 +15,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.FocusMeteringAction
@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -65,6 +66,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -97,7 +99,7 @@ class QrScannerActivity : ComponentActivity() {
 
     private var previewView: PreviewView? = null
     private var cameraProvider: ProcessCameraProvider? = null
-    private var camera: androidx.camera.core.Camera? = null
+    private var camera: Camera? = null
     private var cameraStarting = false
     private var permissionRequested = false
     private var uiState by mutableStateOf<QrScannerUiState>(QrScannerUiState.Scanning)
@@ -133,8 +135,8 @@ class QrScannerActivity : ComponentActivity() {
         )
         analysisExecutor = Executors.newSingleThreadExecutor()
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT)
         )
         setContent {
             val themeViewModel = koinViewModel<ThemeViewModel>()
@@ -298,7 +300,7 @@ class QrScannerActivity : ComponentActivity() {
         }
     }
 
-    private fun observeCameraState(currentCamera: androidx.camera.core.Camera) {
+    private fun observeCameraState(currentCamera: Camera) {
         hasFlash = currentCamera.cameraInfo.hasFlashUnit()
         currentCamera.cameraInfo.zoomState.observe(this) { state ->
             minimumZoomRatio = state.minZoomRatio
@@ -353,7 +355,7 @@ class QrScannerActivity : ComponentActivity() {
     private fun returnResult(value: String) {
         if (isFinishing || isDestroyed) return
         setResult(
-            Activity.RESULT_OK,
+            RESULT_OK,
             Intent().putExtra(EXTRA_QR_VALUE, value)
         )
         finish()
@@ -418,7 +420,7 @@ private fun QrScannerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color.Black)
+            .background(Color.Black)
             .pointerInput(Unit) {
                 detectTapGestures(onTap = onFocus)
             }
@@ -448,7 +450,7 @@ private fun QrScannerScreen(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.48f))
+                .background(Color.Black.copy(alpha = 0.48f))
                 .statusBarsPadding()
                 .height(64.dp)
                 .padding(horizontal = 8.dp)
@@ -457,15 +459,15 @@ private fun QrScannerScreen(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.back),
-                    tint = androidx.compose.ui.graphics.Color.White
+                    tint = Color.White
                 )
             }
             Text(
                 text = stringResource(R.string.qr_scanner_title),
                 style = MaterialTheme.typography.titleLarge,
-                color = androidx.compose.ui.graphics.Color.White
+                color = Color.White
             )
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(1f))
             if (hasFlash) {
                 IconButton(onClick = onToggleTorch) {
                     Icon(
@@ -480,7 +482,7 @@ private fun QrScannerScreen(
                         tint = if (torchEnabled) {
                             MaterialTheme.colorScheme.primary
                         } else {
-                            androidx.compose.ui.graphics.Color.White
+                            Color.White
                         }
                     )
                 }
@@ -563,13 +565,11 @@ private fun ScannerFinder(
             val finderSize = minOf(size.width, size.height) * QrScanRegion.FINDER_SIZE_FRACTION
             val left = (size.width - finderSize) / 2f
             val top = (size.height - finderSize) / 2f
-            val right = left + finderSize
-            val bottom = top + finderSize
-            val scrim = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.56f)
+            val scrim = Color.Black.copy(alpha = 0.56f)
 
             drawRect(scrim)
             drawRoundRect(
-                color = androidx.compose.ui.graphics.Color.Transparent,
+                color = Color.Transparent,
                 topLeft = Offset(left, top),
                 size = Size(finderSize, finderSize),
                 cornerRadius = CornerRadius(cornerRadius),

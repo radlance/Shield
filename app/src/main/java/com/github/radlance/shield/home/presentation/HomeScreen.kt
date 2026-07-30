@@ -47,6 +47,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.radlance.shield.R
 import com.github.radlance.shield.qr.QrScannerActivity
+import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
 import com.github.radlance.shield.subscription.presentation.ImportIntentBus
@@ -373,7 +374,7 @@ private fun transportIcon(transport: VlessTransport): String = when (transport) 
     VlessTransport.GRPC -> "G"
 }
 
-private fun profileDescription(profile: com.github.radlance.shield.subscription.domain.VlessProfile): String =
+private fun profileDescription(profile: VlessProfile): String =
     buildString {
         append(profile.server)
         append(':')

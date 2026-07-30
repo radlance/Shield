@@ -6,6 +6,7 @@ import com.github.radlance.shield.subscription.domain.VlessTransport
 import com.github.radlance.shield.vpn.routing.RoutingRuleSetPaths
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -41,12 +42,12 @@ class SingBoxConfigGenerator {
                         put("type", "tun")
                         put("tag", "tun-in")
                         putJsonArray("address") {
-                            add(kotlinx.serialization.json.JsonPrimitive("172.19.0.1/30"))
-                            add(kotlinx.serialization.json.JsonPrimitive("fdfe:dcba:9876::1/126"))
+                            add(JsonPrimitive("172.19.0.1/30"))
+                            add(JsonPrimitive("fdfe:dcba:9876::1/126"))
                         }
                         putJsonArray("route_address") {
-                            add(kotlinx.serialization.json.JsonPrimitive("0.0.0.0/0"))
-                            add(kotlinx.serialization.json.JsonPrimitive("::/0"))
+                            add(JsonPrimitive("0.0.0.0/0"))
+                            add(JsonPrimitive("::/0"))
                         }
                         put("mtu", 1400)
                         put("auto_route", true)
@@ -190,7 +191,7 @@ class SingBoxConfigGenerator {
                 put("strategy", "prefer_ipv4")
             }
         }
-        return json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), root)
+        return json.encodeToString(JsonObject.serializer(), root)
     }
 
     private fun localRuleSet(tag: String, path: String) = buildJsonObject {
@@ -224,7 +225,7 @@ class SingBoxConfigGenerator {
                 put("server_name", profile.serverName ?: profile.server)
                 if (profile.alpn.isNotEmpty()) {
                     put("alpn", buildJsonArray {
-                        profile.alpn.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) }
+                        profile.alpn.forEach { add(JsonPrimitive(it)) }
                     })
                 }
                 profile.fingerprint?.let { fingerprint ->
