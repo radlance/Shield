@@ -54,6 +54,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -99,6 +101,10 @@ class ShieldVpnService :
         when (intent?.action) {
             ACTION_DISCONNECT -> disconnect()
             ACTION_RELOAD -> serviceReload()
+            ACTION_SWITCH_PROFILE -> {
+                val profileId = intent.getStringExtra(EXTRA_PROFILE_ID)
+                if (profileId != null) switchProfile(profileId)
+            }
             ACTION_CONNECT -> {
                 val profileId = intent.getStringExtra(EXTRA_PROFILE_ID)
                 if (profileId != null) connect(profileId)
@@ -134,7 +140,11 @@ class ShieldVpnService :
         super.onDestroy()
     }
 
-    private fun connect(profileId: String, force: Boolean = false) {
+    private fun connect(
+        profileId: String,
+        force: Boolean = false,
+        persistSelection: Boolean = false
+    ) {
         if (prepare(this) != null) {
             _connectionState.value = VpnConnectionState.PermissionRequired
             stopSelf()
@@ -145,18 +155,31 @@ class ShieldVpnService :
             activeProfileId == profileId &&
             _connectionState.value is VpnConnectionState.Connected
         ) return
+        if (persistSelection) {
+            _connectionState.value = VpnConnectionState.Disconnecting
+        }
         val previousJob = connectionJob
         previousJob?.cancel()
+        if (persistSelection) {
+            closeCore()
+            activeProfileId = null
+        }
         startForeground(NOTIFICATION_ID, buildServiceNotification(getString(R.string.notification_connecting)))
         connectionJob = scope.launch {
-            previousJob?.join()
-            val profile = repository.getProfile(profileId)
-            if (profile == null) {
-                fail("Selected profile no longer exists")
-                return@launch
-            }
-            _connectionState.value = VpnConnectionState.Connecting(profile.name)
+            var startingServer: CommandServer? = null
             try {
+                val profile = repository.getProfile(profileId)
+                if (profile == null) {
+                    fail("Selected profile no longer exists")
+                    return@launch
+                }
+                if (persistSelection) {
+                    repository.selectProfile(profile.id)
+                }
+                previousJob?.join()
+                closeCore()
+                activeProfileId = null
+                _connectionState.value = VpnConnectionState.Connecting(profile.name)
                 val routingSettings = routingSettingsRepository.settings.first()
                 val ruleSetPaths = if (routingSettings.smartRussianRouting) {
                     runCatching { routingRuleSetProvider.prepareRuleSets() }
@@ -169,9 +192,11 @@ class ShieldVpnService :
                 } else {
                     null
                 }
-                closeCore()
                 underlyingNetwork = findUnderlyingNetwork()
                 val server = CommandServer(this@ShieldVpnService, this@ShieldVpnService)
+                startingServer = server
+                commandServer = server
+                currentCoroutineContext().ensureActive()
                 server.start()
                 server.startOrReloadService(
                     configGenerator.generate(
@@ -184,7 +209,7 @@ class ShieldVpnService :
                     ),
                     OverrideOptions()
                 )
-                commandServer = server
+                currentCoroutineContext().ensureActive()
                 activeProfileId = profile.id
                 runCatching { vpnStateStore.setActiveProfileId(profile.id) }
                     .onFailure { error ->
@@ -221,25 +246,28 @@ class ShieldVpnService :
                             }
                     }
                 }
-                if (
-                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-                    ContextCompat.checkSelfPermission(
-                        this@ShieldVpnService,
-                        Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED
-                ) {
-                    NotificationManagerCompat.from(this@ShieldVpnService).notify(
-                        NOTIFICATION_ID,
-                        buildServiceNotification(getString(R.string.notification_connected, profile.name))
-                    )
-                }
+                notifyConnected(profile.name)
             } catch (error: CancellationException) {
+                if (commandServer === startingServer) {
+                    closeCore()
+                }
                 throw error
             } catch (error: Exception) {
-                closeCore()
+                currentCoroutineContext().ensureActive()
+                if (startingServer == null || commandServer === startingServer) {
+                    closeCore()
+                }
                 fail(error.message ?: "Unable to start sing-box")
             }
         }
+    }
+
+    private fun switchProfile(profileId: String) {
+        if (
+            activeProfileId == profileId &&
+            _connectionState.value is VpnConnectionState.Connected
+        ) return
+        connect(profileId, force = true, persistSelection = true)
     }
 
     private fun disconnect() {
@@ -319,6 +347,21 @@ class ShieldVpnService :
                     getString(R.string.notification_channel_vpn),
                     NotificationManager.IMPORTANCE_LOW
                 )
+            )
+        }
+    }
+
+    private fun notifyConnected(profileName: String) {
+        if (
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            NotificationManagerCompat.from(this).notify(
+                NOTIFICATION_ID,
+                buildServiceNotification(getString(R.string.notification_connected, profileName))
             )
         }
     }
@@ -582,6 +625,7 @@ class ShieldVpnService :
         const val ACTION_CONNECT = "com.github.radlance.shield.action.CONNECT"
         const val ACTION_DISCONNECT = "com.github.radlance.shield.action.DISCONNECT"
         const val ACTION_RELOAD = "com.github.radlance.shield.action.RELOAD"
+        const val ACTION_SWITCH_PROFILE = "com.github.radlance.shield.action.SWITCH_PROFILE"
         const val EXTRA_PROFILE_ID = "profile_id"
 
         private const val NOTIFICATION_CHANNEL = "shield_vpn"

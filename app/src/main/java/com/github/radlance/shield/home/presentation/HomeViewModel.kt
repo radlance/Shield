@@ -74,9 +74,21 @@ class HomeViewModel(
     }
 
     fun selectProfile(profileId: String) {
-        val active = uiState.value.connectionState is VpnConnectionState.Connected
-        if (active) {
-            message.value = "Disconnect before changing profiles"
+        val state = uiState.value
+        val connection = state.connectionState
+        if (
+            connection is VpnConnectionState.Connected ||
+            connection is VpnConnectionState.Connecting ||
+            connection is VpnConnectionState.Reconnecting ||
+            connection is VpnConnectionState.Disconnecting
+        ) {
+            val activeProfileId = (connection as? VpnConnectionState.Connected)
+                ?.profileId
+                ?: state.selectedProfileId
+            if (activeProfileId != profileId) {
+                message.value = null
+                vpnController.switchProfile(profileId)
+            }
             return
         }
         viewModelScope.launch {

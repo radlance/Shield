@@ -22,6 +22,15 @@ class AndroidVpnController(
         )
     }
 
+    override fun switchProfile(profileId: String) {
+        ContextCompat.startForegroundService(
+            context,
+            Intent(context, ShieldVpnService::class.java)
+                .setAction(ShieldVpnService.ACTION_SWITCH_PROFILE)
+                .putExtra(ShieldVpnService.EXTRA_PROFILE_ID, profileId)
+        )
+    }
+
     override fun disconnect() {
         context.startService(
             Intent(context, ShieldVpnService::class.java)
