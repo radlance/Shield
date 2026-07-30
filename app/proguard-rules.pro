@@ -1,0 +1,3 @@
+-keep class com.google.mlkit.** { *; }
+-dontwarn androidx.window.extensions.**
+-dontwarn androidx.window.sidecar.**
