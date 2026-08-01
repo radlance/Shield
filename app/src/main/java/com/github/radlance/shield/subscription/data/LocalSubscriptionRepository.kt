@@ -93,7 +93,7 @@ class LocalSubscriptionRepository(
         )
         mutate { current ->
             current.copy(
-                subscriptions = current.subscriptions + subscription,
+                subscriptions = listOf(subscription) + current.subscriptions,
                 profiles = current.profiles + parsed.profiles,
                 selectedProfileId = current.selectedProfileId ?: parsed.profiles.firstOrNull()?.id
             )

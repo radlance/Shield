@@ -153,7 +153,7 @@ fun CollapsibleServerList(
                                 SubscriptionAccessStatus.TRAFFIC_EXHAUSTED ->
                                     MaterialTheme.colorScheme.error
                             },
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
