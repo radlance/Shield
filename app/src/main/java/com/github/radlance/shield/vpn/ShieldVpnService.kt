@@ -70,6 +70,7 @@ import kotlinx.coroutines.sync.withLock
 import org.koin.android.ext.android.inject
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration.Companion.milliseconds
 import android.app.Notification as AndroidNotification
@@ -100,6 +101,7 @@ class ShieldVpnService :
     private var interfaceListener: InterfaceUpdateListener? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private val networkMonitorGeneration = AtomicLong()
+    private val observedNetworks = ConcurrentHashMap.newKeySet<Network>()
     @Volatile
     private var underlyingNetwork: Network? = null
     private var reportedNetwork: Network? = null
@@ -510,12 +512,14 @@ class ShieldVpnService :
                 override fun onAvailable(network: Network) {
                     if (generation != networkMonitorGeneration.get()) return
                     if (isUnderlyingNetwork(network)) {
+                        observedNetworks.add(network)
                         updateDefaultInterface(selectUnderlyingNetwork())
                     }
                 }
 
                 override fun onLost(network: Network) {
                     if (generation != networkMonitorGeneration.get()) return
+                    observedNetworks.remove(network)
                     if (network == underlyingNetwork) {
                         underlyingNetwork = null
                         updateDefaultInterface(selectUnderlyingNetwork())
@@ -524,7 +528,12 @@ class ShieldVpnService :
 
                 override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
                     if (generation != networkMonitorGeneration.get()) return
-                    if (network == underlyingNetwork || isUnderlyingNetwork(network)) {
+                    if (isUnderlyingNetwork(network)) {
+                        observedNetworks.add(network)
+                    } else {
+                        observedNetworks.remove(network)
+                    }
+                    if (network == underlyingNetwork || observedNetworks.contains(network)) {
                         updateDefaultInterface(selectUnderlyingNetwork())
                     }
                 }
@@ -674,6 +683,7 @@ class ShieldVpnService :
         networkMonitorGeneration.incrementAndGet()
         networkCallback?.let { runCatching { connectivity.unregisterNetworkCallback(it) } }
         networkCallback = null
+        observedNetworks.clear()
     }
 
     private fun publishUnderlyingNetwork(network: Network?) {
@@ -699,15 +709,10 @@ class ShieldVpnService :
             .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
         val handler = Handler(Looper.getMainLooper())
-        when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-                connectivity.registerBestMatchingNetworkCallback(request, callback, handler)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ->
-                connectivity.requestNetwork(request, callback, handler)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O ->
-                connectivity.registerDefaultNetworkCallback(callback, handler)
-            else ->
-                connectivity.registerDefaultNetworkCallback(callback)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            connectivity.registerNetworkCallback(request, callback, handler)
+        } else {
+            connectivity.registerNetworkCallback(request, callback)
         }
     }
 
@@ -719,7 +724,17 @@ class ShieldVpnService :
     }
 
     private fun selectUnderlyingNetwork(): Network? {
-        val candidates = connectivity.allNetworks.filter(::isUnderlyingNetwork)
+        val candidates = buildList {
+            observedNetworks.forEach { network ->
+                if (isUnderlyingNetwork(network)) add(network)
+            }
+            connectivity.activeNetwork
+                ?.takeIf(::isUnderlyingNetwork)
+                ?.let { if (!contains(it)) add(it) }
+            underlyingNetwork
+                ?.takeIf(::isUnderlyingNetwork)
+                ?.let { if (!contains(it)) add(it) }
+        }
         if (candidates.isEmpty()) return null
         val best = candidates.maxByOrNull(::networkScore) ?: return null
         val current = underlyingNetwork?.takeIf(candidates::contains)
