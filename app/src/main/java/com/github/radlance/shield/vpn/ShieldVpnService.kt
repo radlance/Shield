@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.IpPrefix
@@ -19,6 +20,7 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.system.OsConstants
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -26,6 +28,7 @@ import com.github.radlance.shield.R
 import com.github.radlance.shield.core.MainActivity
 import com.github.radlance.shield.diagnostics.DiagnosticLog
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
+import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.vpn.data.InterfaceAddressFormatter
 import com.github.radlance.shield.vpn.data.SingBoxConfigGenerator
 import com.github.radlance.shield.vpn.data.VpnRoutingConfig
@@ -55,15 +58,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.android.ext.android.inject
 import java.net.InetAddress
 import java.net.NetworkInterface
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.milliseconds
 import android.app.Notification as AndroidNotification
 import io.nekohasekai.libbox.NetworkInterface as LibboxNetworkInterface
 
@@ -84,12 +92,21 @@ class ShieldVpnService :
     private var commandServer: CommandServer? = null
     private var tunDescriptor: ParcelFileDescriptor? = null
     private var activeProfileId: String? = null
+    private var activeConfig: String? = null
     private var connectionJob: Job? = null
+    private var reloadJob: Job? = null
+    private val reloadMutex = Mutex()
+    private val reloadGeneration = AtomicLong()
     private var interfaceListener: InterfaceUpdateListener? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private val networkMonitorGeneration = AtomicLong()
+    @Volatile
     private var underlyingNetwork: Network? = null
+    private var reportedNetwork: Network? = null
+    private var reportedInterfaceName: String = ""
+    private var reportedInterfaceIndex: Int = -1
     private val localDnsTransport by lazy {
-        AndroidLocalDnsTransport(applicationContext) { underlyingNetwork }
+        AndroidLocalDnsTransport(applicationContext) { findUnderlyingNetwork() }
     }
 
     override fun onCreate() {
@@ -145,6 +162,9 @@ class ShieldVpnService :
         force: Boolean = false,
         persistSelection: Boolean = false
     ) {
+        reloadGeneration.incrementAndGet()
+        val previousReloadJob = reloadJob
+        previousReloadJob?.cancel()
         if (prepare(this) != null) {
             _connectionState.value = VpnConnectionState.PermissionRequired
             stopSelf()
@@ -161,7 +181,6 @@ class ShieldVpnService :
         val previousJob = connectionJob
         previousJob?.cancel()
         if (persistSelection) {
-            closeCore()
             activeProfileId = null
         }
         startForeground(NOTIFICATION_ID, buildServiceNotification(getString(R.string.notification_connecting)))
@@ -176,40 +195,25 @@ class ShieldVpnService :
                 if (persistSelection) {
                     repository.selectProfile(profile.id)
                 }
+                previousReloadJob?.join()
                 previousJob?.join()
                 closeCore()
                 activeProfileId = null
                 _connectionState.value = VpnConnectionState.Connecting(profile.name)
-                val routingSettings = routingSettingsRepository.settings.first()
-                val ruleSetPaths = if (routingSettings.smartRussianRouting) {
-                    runCatching { routingRuleSetProvider.prepareRuleSets() }
-                        .onFailure { error ->
-                            diagnosticLog.record(
-                                "Smart routing disabled: ${error.message.orEmpty()}"
-                            )
-                        }
-                        .getOrNull()
-                } else {
-                    null
-                }
+                val prepared = prepareConfig(profile)
                 underlyingNetwork = findUnderlyingNetwork()
+                    ?: error("No usable physical network is available")
                 val server = CommandServer(this@ShieldVpnService, this@ShieldVpnService)
                 startingServer = server
                 commandServer = server
                 currentCoroutineContext().ensureActive()
                 server.start()
                 server.startOrReloadService(
-                    configGenerator.generate(
-                        profile = profile,
-                        routing = VpnRoutingConfig(
-                            ruleSetPaths = ruleSetPaths,
-                            forceDirectDomains = routingSettings.forceDirectDomains,
-                            forceProxyDomains = routingSettings.forceProxyDomains
-                        )
-                    ),
+                    prepared.config,
                     OverrideOptions()
                 )
                 currentCoroutineContext().ensureActive()
+                activeConfig = prepared.config
                 activeProfileId = profile.id
                 runCatching { vpnStateStore.setActiveProfileId(profile.id) }
                     .onFailure { error ->
@@ -223,7 +227,7 @@ class ShieldVpnService :
                     connectedAtElapsedRealtime = SystemClock.elapsedRealtime()
                 )
                 diagnosticLog.record("Connected through ${profile.name}")
-                if (ruleSetPaths != null) {
+                if (prepared.smartRouting) {
                     scope.launch {
                         runCatching { routingRuleSetProvider.refreshRuleSets() }
                             .onSuccess { result ->
@@ -271,11 +275,15 @@ class ShieldVpnService :
     }
 
     private fun disconnect() {
+        reloadGeneration.incrementAndGet()
+        val previousReloadJob = reloadJob
+        previousReloadJob?.cancel()
         _connectionState.value = VpnConnectionState.Disconnecting
         val previousJob = connectionJob
         previousJob?.cancel()
         activeProfileId = null
         connectionJob = scope.launch {
+            previousReloadJob?.join()
             previousJob?.join()
             closeCore()
             clearPersistedProfile()
@@ -288,11 +296,32 @@ class ShieldVpnService :
 
     private fun closeCore() {
         unregisterNetworkCallback()
+        publishUnderlyingNetwork(null)
         runCatching { commandServer?.closeService() }
         runCatching { commandServer?.close() }
         commandServer = null
-        runCatching { tunDescriptor?.close() }
-        tunDescriptor = null
+        activeConfig = null
+        closeTun()
+    }
+
+    private suspend fun prepareConfig(profile: VlessProfile): PreparedConfig {
+        val settings = routingSettingsRepository.settings.first()
+        val ruleSetPaths = if (settings.smartRussianRouting) {
+            routingRuleSetProvider.prepareRuleSets()
+        } else {
+            null
+        }
+        return PreparedConfig(
+            config = configGenerator.generate(
+                profile = profile,
+                routing = VpnRoutingConfig(
+                    ruleSetPaths = ruleSetPaths,
+                    forceDirectDomains = settings.forceDirectDomains,
+                    forceProxyDomains = settings.forceProxyDomains
+                )
+            ),
+            smartRouting = settings.smartRussianRouting
+        )
     }
 
     private suspend fun fail(message: String) {
@@ -375,7 +404,9 @@ class ShieldVpnService :
     override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener?) {
         if (interfaceListener === listener) {
             interfaceListener = null
-            unregisterNetworkCallback()
+            reportedNetwork = null
+            reportedInterfaceName = ""
+            reportedInterfaceIndex = -1
         }
     }
 
@@ -445,8 +476,14 @@ class ShieldVpnService :
             }
             options.dnsServerAddress?.value?.takeIf(String::isNotBlank)?.let(builder::addDnsServer)
         }
-        val descriptor = builder.establish() ?: error("Android refused to establish the VPN interface")
+        val network = underlyingNetwork?.takeIf(::isUnderlyingNetwork)
+            ?: findUnderlyingNetwork()
+            ?: error("No usable physical network is available")
+        underlyingNetwork = network
+        val descriptor = builder.establish()
+            ?: error("Android refused to establish the VPN interface")
         tunDescriptor = descriptor
+        publishUnderlyingNetwork(network)
         return descriptor.fd
     }
 
@@ -458,23 +495,37 @@ class ShieldVpnService :
 
     override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener?) {
         if (listener == null) return
+        if (interfaceListener !== listener) {
+            reportedNetwork = null
+            reportedInterfaceName = ""
+            reportedInterfaceIndex = -1
+        }
         interfaceListener = listener
         updateDefaultInterface(
             underlyingNetwork?.takeIf(::isUnderlyingNetwork) ?: findUnderlyingNetwork()
         )
         if (networkCallback == null) {
+            val generation = networkMonitorGeneration.incrementAndGet()
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    if (isUnderlyingNetwork(network)) updateDefaultInterface(network)
+                    if (generation != networkMonitorGeneration.get()) return
+                    if (isUnderlyingNetwork(network)) {
+                        updateDefaultInterface(selectUnderlyingNetwork())
+                    }
                 }
 
                 override fun onLost(network: Network) {
-                    if (network == underlyingNetwork) updateDefaultInterface(findUnderlyingNetwork())
+                    if (generation != networkMonitorGeneration.get()) return
+                    if (network == underlyingNetwork) {
+                        underlyingNetwork = null
+                        updateDefaultInterface(selectUnderlyingNetwork())
+                    }
                 }
 
                 override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
-                    if (network == underlyingNetwork && isUnderlyingNetwork(network)) {
-                        updateDefaultInterface(network)
+                    if (generation != networkMonitorGeneration.get()) return
+                    if (network == underlyingNetwork || isUnderlyingNetwork(network)) {
+                        updateDefaultInterface(selectUnderlyingNetwork())
                     }
                 }
             }
@@ -494,20 +545,103 @@ class ShieldVpnService :
     }
 
     override fun serviceReload() {
-        activeProfileId?.let { profileId -> connect(profileId, force = true) }
+        val generation = reloadGeneration.incrementAndGet()
+        reloadJob?.cancel()
+        reloadJob = scope.launch {
+            delay(RELOAD_DEBOUNCE_MILLIS.milliseconds)
+            reloadMutex.withLock {
+                currentCoroutineContext().ensureActive()
+                if (generation != reloadGeneration.get()) return@withLock
+                val connected = _connectionState.value as? VpnConnectionState.Connected
+                    ?: return@withLock
+                val profileId = activeProfileId ?: return@withLock
+                val profile = repository.getProfile(profileId) ?: return@withLock
+                val previousConfig = activeConfig ?: return@withLock
+
+                val prepared = runCatching { prepareConfig(profile) }
+                    .getOrElse { error ->
+                        diagnosticLog.record(
+                            "Routing reload preparation failed: ${error.message.orEmpty()}"
+                        )
+                        _connectionState.value = connected
+                        return@withLock
+                    }
+                currentCoroutineContext().ensureActive()
+                if (generation != reloadGeneration.get()) {
+                    _connectionState.value = connected
+                    return@withLock
+                }
+                if (prepared.config == previousConfig) {
+                    return@withLock
+                }
+
+                _connectionState.value = VpnConnectionState.Reconnecting(connected.profileName)
+                diagnosticLog.record(
+                    "Reloading routing configuration: smart=${prepared.smartRouting}"
+                )
+                val server = commandServer ?: run {
+                    _connectionState.value = connected
+                    return@withLock
+                }
+                underlyingNetwork = findUnderlyingNetwork()
+                    ?: run {
+                        diagnosticLog.record("Routing reload postponed: physical network unavailable")
+                        _connectionState.value = connected
+                        return@withLock
+                    }
+                publishUnderlyingNetwork(underlyingNetwork)
+                val reloadError = runCatching {
+                    server.startOrReloadService(prepared.config, OverrideOptions())
+                }.exceptionOrNull()
+                if (
+                    generation != reloadGeneration.get() ||
+                    activeProfileId != profileId
+                ) return@withLock
+                if (reloadError == null) {
+                    activeConfig = prepared.config
+                    _connectionState.value = connected
+                    diagnosticLog.record("Routing configuration applied")
+                    return@withLock
+                }
+
+                diagnosticLog.record(
+                    "Routing reload failed; restoring previous configuration"
+                )
+                val rollbackError = runCatching {
+                    server.startOrReloadService(previousConfig, OverrideOptions())
+                }.exceptionOrNull()
+                if (rollbackError == null) {
+                    activeConfig = previousConfig
+                    _connectionState.value = connected
+                    diagnosticLog.record("Previous routing configuration restored")
+                } else {
+                    diagnosticLog.record("Routing rollback failed")
+                    closeCore()
+                    activeProfileId = null
+                    fail(reloadError.message ?: "Unable to reload routing configuration")
+                }
+            }
+        }
     }
 
     override fun serviceStop() {
-        disconnect()
+        closeTun()
+        runCatching { commandServer?.closeService() }
     }
 
     override fun setSystemProxyEnabled(enabled: Boolean) = Unit
     override fun writeDebugMessage(message: String?) {
-        message?.let(diagnosticLog::record)
+        message?.let { debugMessage ->
+            diagnosticLog.record(debugMessage)
+            if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+                Log.d(DEBUG_LOG_TAG, debugMessage)
+            }
+        }
     }
 
     private fun updateDefaultInterface(network: Network?) {
         underlyingNetwork = network
+        if (tunDescriptor != null) publishUnderlyingNetwork(network)
         val listener = interfaceListener ?: return
         val name = network
             ?.let(connectivity::getLinkProperties)
@@ -516,6 +650,17 @@ class ShieldVpnService :
         val index = name.takeIf(String::isNotBlank)
             ?.let { runCatching { NetworkInterface.getByName(it).index }.getOrDefault(-1) }
             ?: -1
+        if (
+            network == reportedNetwork &&
+            name == reportedInterfaceName &&
+            index == reportedInterfaceIndex
+        ) return
+        reportedNetwork = network
+        reportedInterfaceName = name
+        reportedInterfaceIndex = index
+        diagnosticLog.record(
+            if (name.isBlank()) "Physical network unavailable" else "Physical network changed: $name"
+        )
         listener.updateDefaultInterface(name, index, false, false)
         commandServer?.resetNetwork()
         val connected = _connectionState.value as? VpnConnectionState.Connected
@@ -526,8 +671,25 @@ class ShieldVpnService :
     }
 
     private fun unregisterNetworkCallback() {
+        networkMonitorGeneration.incrementAndGet()
         networkCallback?.let { runCatching { connectivity.unregisterNetworkCallback(it) } }
         networkCallback = null
+    }
+
+    private fun publishUnderlyingNetwork(network: Network?) {
+        runCatching { setUnderlyingNetworks(network?.let(::arrayOf)) }
+            .onSuccess { published ->
+                if (!published && network != null) {
+                    diagnosticLog.record("Android rejected the physical network association")
+                }
+            }
+            .onFailure { diagnosticLog.record("Unable to publish underlying network") }
+    }
+
+    private fun closeTun() {
+        val descriptor = tunDescriptor
+        tunDescriptor = null
+        runCatching { descriptor?.close() }
     }
 
     private fun registerUnderlyingNetworkCallback(callback: ConnectivityManager.NetworkCallback) {
@@ -553,7 +715,26 @@ class ShieldVpnService :
         underlyingNetwork?.takeIf(::isUnderlyingNetwork)?.let { return it }
         val active = connectivity.activeNetwork
         if (active != null && isUnderlyingNetwork(active)) return active
-        return null
+        return selectUnderlyingNetwork()
+    }
+
+    private fun selectUnderlyingNetwork(): Network? {
+        val candidates = connectivity.allNetworks.filter(::isUnderlyingNetwork)
+        if (candidates.isEmpty()) return null
+        val best = candidates.maxByOrNull(::networkScore) ?: return null
+        val current = underlyingNetwork?.takeIf(candidates::contains)
+        return if (current != null && networkScore(current) >= networkScore(best)) current else best
+    }
+
+    private fun networkScore(network: Network): Int {
+        val capabilities = connectivity.getNetworkCapabilities(network) ?: return Int.MIN_VALUE
+        return (if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) 100 else 0) +
+            when {
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> 30
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> 20
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> 10
+                else -> 0
+            }
     }
 
     private fun isUnderlyingNetwork(network: Network): Boolean {
@@ -621,6 +802,11 @@ class ShieldVpnService :
         override fun next(): LibboxNetworkInterface = iterator.next()
     }
 
+    private data class PreparedConfig(
+        val config: String,
+        val smartRouting: Boolean
+    )
+
     companion object {
         const val ACTION_CONNECT = "com.github.radlance.shield.action.CONNECT"
         const val ACTION_DISCONNECT = "com.github.radlance.shield.action.DISCONNECT"
@@ -630,6 +816,8 @@ class ShieldVpnService :
 
         private const val NOTIFICATION_CHANNEL = "shield_vpn"
         private const val NOTIFICATION_ID = 10
+        private const val RELOAD_DEBOUNCE_MILLIS = 250L
+        private const val DEBUG_LOG_TAG = "ShieldCore"
 
         private val _connectionState = MutableStateFlow<VpnConnectionState>(VpnConnectionState.Disconnected)
         val connectionState: StateFlow<VpnConnectionState> = _connectionState.asStateFlow()

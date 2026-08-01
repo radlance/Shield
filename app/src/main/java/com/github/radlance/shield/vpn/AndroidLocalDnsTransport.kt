@@ -13,7 +13,6 @@ import io.nekohasekai.libbox.LocalDNSTransport
 import java.net.InetAddress
 import java.net.UnknownHostException
 import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.runBlocking
@@ -30,7 +29,11 @@ class AndroidLocalDnsTransport(
 
     @RequiresApi(Build.VERSION_CODES.Q)
     override fun exchange(context: ExchangeContext, message: ByteArray) {
-        val network = networkProvider() ?: error("Underlying network is unavailable")
+        val network = networkProvider()
+        if (network == null) {
+            context.errorCode(RCODE_SERVFAIL)
+            return
+        }
         runBlocking {
             suspendCancellableCoroutine { continuation ->
                 val signal = CancellationSignal()
@@ -41,12 +44,16 @@ class AndroidLocalDnsTransport(
                 resolver().rawQuery(
                     network,
                     message,
-                    DnsResolver.FLAG_NO_RETRY,
+                    DnsResolver.FLAG_EMPTY,
                     Dispatchers.IO.asExecutor(),
                     signal,
                     object : DnsResolver.Callback<ByteArray> {
                         override fun onAnswer(answer: ByteArray, rcode: Int) {
-                            if (rcode == 0) context.rawSuccess(answer) else context.errorCode(rcode)
+                            if (rcode == 0 && answer.isNotEmpty()) {
+                                context.rawSuccess(answer)
+                            } else {
+                                context.errorCode(if (rcode == 0) RCODE_SERVFAIL else rcode)
+                            }
                             if (continuation.isActive) continuation.resume(Unit)
                         }
 
@@ -55,8 +62,9 @@ class AndroidLocalDnsTransport(
                             if (cause is ErrnoException) {
                                 context.errnoCode(cause.errno)
                                 if (continuation.isActive) continuation.resume(Unit)
-                            } else if (continuation.isActive) {
-                                continuation.resumeWithException(error)
+                            } else {
+                                context.errorCode(RCODE_SERVFAIL)
+                                if (continuation.isActive) continuation.resume(Unit)
                             }
                         }
                     }
@@ -66,7 +74,11 @@ class AndroidLocalDnsTransport(
     }
 
     override fun lookup(context: ExchangeContext, networkName: String, domain: String) {
-        val network = networkProvider() ?: error("Underlying network is unavailable")
+        val network = networkProvider()
+        if (network == null) {
+            context.errorCode(RCODE_SERVFAIL)
+            return
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             val addresses = try {
                 network.getAllByName(domain)
@@ -97,7 +109,12 @@ class AndroidLocalDnsTransport(
                 val callback = object : DnsResolver.Callback<Collection<InetAddress>> {
                     override fun onAnswer(answer: Collection<InetAddress>, rcode: Int) {
                         if (rcode == 0) {
-                            context.success(answer.mapNotNull(InetAddress::getHostAddress).joinToString("\n"))
+                            val addresses = answer.mapNotNull(InetAddress::getHostAddress)
+                            if (addresses.isEmpty()) {
+                                context.errorCode(RCODE_SERVFAIL)
+                            } else {
+                                context.success(addresses.joinToString("\n"))
+                            }
                         } else {
                             context.errorCode(rcode)
                         }
@@ -109,8 +126,9 @@ class AndroidLocalDnsTransport(
                         if (cause is ErrnoException) {
                             context.errnoCode(cause.errno)
                             if (continuation.isActive) continuation.resume(Unit)
-                        } else if (continuation.isActive) {
-                            continuation.resumeWithException(error)
+                        } else {
+                            context.errorCode(RCODE_SERVFAIL)
+                            if (continuation.isActive) continuation.resume(Unit)
                         }
                     }
                 }
@@ -123,7 +141,7 @@ class AndroidLocalDnsTransport(
                     resolver().query(
                         network,
                         domain,
-                        DnsResolver.FLAG_NO_RETRY,
+                        DnsResolver.FLAG_EMPTY,
                         Dispatchers.IO.asExecutor(),
                         signal,
                         callback
@@ -133,7 +151,7 @@ class AndroidLocalDnsTransport(
                         network,
                         domain,
                         type,
-                        DnsResolver.FLAG_NO_RETRY,
+                        DnsResolver.FLAG_EMPTY,
                         Dispatchers.IO.asExecutor(),
                         signal,
                         callback
@@ -151,6 +169,7 @@ class AndroidLocalDnsTransport(
     }
 
     private companion object {
+        const val RCODE_SERVFAIL = 2
         const val RCODE_NXDOMAIN = 3
 
         @RequiresApi(Build.VERSION_CODES.Q)

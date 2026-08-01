@@ -39,7 +39,10 @@ class AndroidVpnController(
     }
 
     override fun reload() {
-        if (state.value !is VpnConnectionState.Connected) return
+        if (
+            state.value !is VpnConnectionState.Connected &&
+            state.value !is VpnConnectionState.Reconnecting
+        ) return
         context.startService(
             Intent(context, ShieldVpnService::class.java)
                 .setAction(ShieldVpnService.ACTION_RELOAD)

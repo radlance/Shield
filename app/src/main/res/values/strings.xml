@@ -47,6 +47,6 @@
     <string name="domain_overrides_description">Enter one domain per line. Subdomains are included automatically.</string>
     <string name="domains">Domains</string>
     <string name="save">Save</string>
-    <string name="routing_reconnect_hint">Routing changes reconnect an active VPN automatically.</string>
+    <string name="routing_reconnect_hint">Routing changes apply to an active VPN automatically.</string>
     <string name="about_shield">Shield is an open-source VLESS VPN client powered by sing-box.</string>
 </resources>

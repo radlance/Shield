@@ -92,26 +92,35 @@ class SingBoxConfigGenerator {
                     }
                     if (ruleSetPaths != null) {
                         add(buildJsonObject {
-                            put(
-                                "rule_set",
-                                listOf(
-                                    BLOCKED_DOMAINS_TAG,
-                                    BLOCKED_IPS_TAG,
-                                    BLOCKED_COMMUNITY_IPS_TAG
-                                ).toJsonArray()
-                            )
+                            put("ip_version", 6)
+                            put("action", "route")
+                            put("outbound", "proxy")
+                        })
+                        add(buildJsonObject {
+                            put("rule_set", AVAILABLE_ONLY_INSIDE_TAG)
+                            put("action", "route")
+                            put("outbound", "direct")
+                        })
+                        add(buildJsonObject {
+                            put("rule_set", BLOCKED_DOMAINS_TAG)
                             put("action", "route")
                             put("outbound", "proxy")
                         })
                         add(buildJsonObject {
                             put(
                                 "rule_set",
-                                listOf(
-                                    AVAILABLE_ONLY_INSIDE_TAG,
-                                    RUSSIAN_DOMAINS_TAG,
-                                    RUSSIAN_IPS_TAG
-                                ).toJsonArray()
+                                listOf(BLOCKED_IPS_TAG, BLOCKED_COMMUNITY_IPS_TAG).toJsonArray()
                             )
+                            put("action", "route")
+                            put("outbound", "proxy")
+                        })
+                        add(buildJsonObject {
+                            put("rule_set", RUSSIAN_DOMAINS_TAG)
+                            put("action", "route")
+                            put("outbound", "direct")
+                        })
+                        add(buildJsonObject {
+                            put("rule_set", RUSSIAN_IPS_TAG)
                             put("action", "route")
                             put("outbound", "direct")
                         })
@@ -148,10 +157,15 @@ class SingBoxConfigGenerator {
                         put("tag", "local-dns")
                     })
                     add(buildJsonObject {
-                        put("type", "tls")
+                        put("type", "https")
                         put("tag", "remote-dns")
                         put("server", "1.1.1.1")
-                        put("server_port", 853)
+                        put("server_port", 443)
+                        put("path", "/dns-query")
+                        putJsonObject("tls") {
+                            put("enabled", true)
+                            put("server_name", "cloudflare-dns.com")
+                        }
                         put("detour", "proxy")
                     })
                 }
@@ -165,30 +179,41 @@ class SingBoxConfigGenerator {
                             add(dnsDomainRule(forceProxyDomains, "remote-dns"))
                         }
                         if (forceDirectDomains.isNotEmpty()) {
-                            add(dnsDomainRule(forceDirectDomains, "local-dns"))
+                            add(
+                                dnsDomainRule(
+                                    forceDirectDomains,
+                                    "local-dns",
+                                    DIRECT_DNS_STRATEGY
+                                )
+                            )
                         }
                         if (ruleSetPaths != null) {
+                            add(
+                                dnsRuleSetRule(
+                                    AVAILABLE_ONLY_INSIDE_TAG,
+                                    "local-dns",
+                                    DIRECT_DNS_STRATEGY
+                                )
+                            )
                             add(buildJsonObject {
                                 put("rule_set", BLOCKED_DOMAINS_TAG)
                                 put("action", "route")
                                 put("server", "remote-dns")
                             })
-                            add(buildJsonObject {
-                                put(
-                                    "rule_set",
-                                    listOf(
-                                        AVAILABLE_ONLY_INSIDE_TAG,
-                                        RUSSIAN_DOMAINS_TAG
-                                    ).toJsonArray()
+                            add(
+                                dnsRuleSetRule(
+                                    RUSSIAN_DOMAINS_TAG,
+                                    "local-dns",
+                                    DIRECT_DNS_STRATEGY
                                 )
-                                put("action", "route")
-                                put("server", "local-dns")
-                            })
+                            )
                         }
                     }
                 }
                 put("final", "remote-dns")
                 put("strategy", "prefer_ipv4")
+                put("independent_cache", true)
+                put("reverse_mapping", true)
             }
         }
         return json.encodeToString(JsonObject.serializer(), root)
@@ -201,10 +226,26 @@ class SingBoxConfigGenerator {
         put("path", path)
     }
 
-    private fun dnsDomainRule(domains: List<String>, server: String) = buildJsonObject {
+    private fun dnsDomainRule(
+        domains: List<String>,
+        server: String,
+        strategy: String? = null
+    ) = buildJsonObject {
         put("domain_suffix", domains.toJsonArray())
         put("action", "route")
         put("server", server)
+        strategy?.let { put("strategy", it) }
+    }
+
+    private fun dnsRuleSetRule(
+        ruleSet: String,
+        server: String,
+        strategy: String? = null
+    ) = buildJsonObject {
+        put("rule_set", ruleSet)
+        put("action", "route")
+        put("server", server)
+        strategy?.let { put("strategy", it) }
     }
 
     private fun Collection<String>.toJsonArray(): JsonArray =
@@ -267,5 +308,6 @@ class SingBoxConfigGenerator {
         const val AVAILABLE_ONLY_INSIDE_TAG = "geosite-ru-available-only-inside"
         const val RUSSIAN_DOMAINS_TAG = "geosite-category-ru"
         const val RUSSIAN_IPS_TAG = "geoip-ru"
+        const val DIRECT_DNS_STRATEGY = "ipv4_only"
     }
 }

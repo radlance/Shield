@@ -5,6 +5,8 @@ import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
 import com.github.radlance.shield.vpn.routing.RoutingRuleSetPaths
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -37,7 +39,8 @@ class SingBoxConfigGeneratorTest {
         val inbounds = root.getValue("inbounds").jsonArray
         val tun = inbounds.single().jsonObject
         val outbounds = root.getValue("outbounds").jsonArray
-        val dnsServers = root.getValue("dns").jsonObject.getValue("servers").jsonArray
+        val dns = root.getValue("dns").jsonObject
+        val dnsServers = dns.getValue("servers").jsonArray
         val route = root.getValue("route").jsonObject
 
         assertEquals("tun", tun.getValue("type").jsonPrimitive.content)
@@ -51,7 +54,16 @@ class SingBoxConfigGeneratorTest {
         assertFalse(config.contains("\"type\":\"socks\""))
         assertEquals("vless", outbounds.first().jsonObject.getValue("type").jsonPrimitive.content)
         assertEquals("local", dnsServers.first().jsonObject.getValue("type").jsonPrimitive.content)
+        assertEquals("https", dnsServers.last().jsonObject.getValue("type").jsonPrimitive.content)
+        assertEquals("443", dnsServers.last().jsonObject.getValue("server_port").jsonPrimitive.content)
+        assertEquals(
+            "cloudflare-dns.com",
+            dnsServers.last().jsonObject.getValue("tls").jsonObject
+                .getValue("server_name").jsonPrimitive.content
+        )
         assertEquals("local-dns", route.getValue("default_domain_resolver").jsonPrimitive.content)
+        assertTrue(dns.getValue("independent_cache").jsonPrimitive.content.toBoolean())
+        assertTrue(dns.getValue("reverse_mapping").jsonPrimitive.content.toBoolean())
         assertEquals(
             "reality",
             outbounds.first().jsonObject
@@ -75,19 +87,23 @@ class SingBoxConfigGeneratorTest {
         val dns = root.getValue("dns").jsonObject
         val routeRules = route.getValue("rules").jsonArray.map { it.jsonObject }
         val blockedIndex = routeRules.indexOfFirst { rule ->
-            rule["rule_set"]?.jsonArray?.any {
-                it.jsonPrimitive.content == "geosite-ru-blocked"
-            } == true
+            (rule["rule_set"] as? JsonPrimitive)?.content == "geosite-ru-blocked"
         }
         val russianIndex = routeRules.indexOfFirst { rule ->
-            rule["rule_set"]?.jsonArray?.any {
-                it.jsonPrimitive.content == "geosite-category-ru"
-            } == true
+            (rule["rule_set"] as? JsonPrimitive)?.content == "geosite-category-ru"
+        }
+        val ipv6FallbackIndex = routeRules.indexOfFirst { rule ->
+            rule["ip_version"]?.jsonPrimitive?.content == "6"
         }
         val ruleSets = route.getValue("rule_set").jsonArray.map { it.jsonObject }
 
         assertTrue(blockedIndex >= 0)
         assertTrue(russianIndex > blockedIndex)
+        assertTrue(ipv6FallbackIndex in 0 until blockedIndex)
+        assertEquals(
+            "proxy",
+            routeRules[ipv6FallbackIndex].getValue("outbound").jsonPrimitive.content
+        )
         assertEquals("proxy", routeRules[blockedIndex].getValue("outbound").jsonPrimitive.content)
         assertEquals("direct", routeRules[russianIndex].getValue("outbound").jsonPrimitive.content)
         assertEquals(6, ruleSets.size)
@@ -95,11 +111,14 @@ class SingBoxConfigGeneratorTest {
             "/routing/geosite-ru-blocked.srs",
             ruleSets.first().getValue("path").jsonPrimitive.content
         )
+        val dnsRules = dns.getValue("rules").jsonArray.map { it.jsonObject }
         assertEquals(
-            listOf("remote-dns", "local-dns", "remote-dns", "local-dns"),
-            dns.getValue("rules").jsonArray.map {
-                it.jsonObject.getValue("server").jsonPrimitive.content
-            }
+            listOf("remote-dns", "local-dns", "local-dns", "remote-dns", "local-dns"),
+            dnsRules.map { it.getValue("server").jsonPrimitive.content }
+        )
+        assertEquals(
+            listOf("ipv4_only", "ipv4_only", "ipv4_only"),
+            dnsRules.mapNotNull { it["strategy"]?.jsonPrimitive?.content }
         )
         assertEquals("proxy", route.getValue("final").jsonPrimitive.content)
         assertEquals("remote-dns", dns.getValue("final").jsonPrimitive.content)
@@ -118,7 +137,9 @@ class SingBoxConfigGeneratorTest {
         val root = Json.parseToJsonElement(config).jsonObject
         val route = root.getValue("route").jsonObject
         val rules = route.getValue("rules").jsonArray.map { it.jsonObject }
-        val domainRules = rules.filter { "domain_suffix" in it }
+        val domainRules = rules.filter {
+            "domain_suffix" in it && it["action"]?.jsonPrimitive?.content == "route"
+        }
 
         assertFalse(config.contains("geosite-category-ru"))
         assertFalse("rule_set" in route)
@@ -128,6 +149,60 @@ class SingBoxConfigGeneratorTest {
             listOf("bank.example", "blocked.example"),
             domainRules.single().getValue("domain_suffix").jsonArray
                 .map { it.jsonPrimitive.content }
+        )
+    }
+
+    @Test
+    fun evaluatesDomainPoliciesBeforeIpPolicies() {
+        val config = SingBoxConfigGenerator().generate(
+            profile = testProfile(),
+            routing = VpnRoutingConfig(ruleSetPaths = testRuleSetPaths())
+        )
+        val root = Json.parseToJsonElement(config).jsonObject
+        val routeRules = root.getValue("route").jsonObject.getValue("rules")
+            .jsonArray.map { it.jsonObject }
+        val dnsRules = root.getValue("dns").jsonObject.getValue("rules")
+            .jsonArray.map { it.jsonObject }
+        val insideOnlyIndex = routeRules.indexOfFirst { rule ->
+            (rule["rule_set"] as? JsonPrimitive)?.content ==
+                "geosite-ru-available-only-inside"
+        }
+        val blockedDomainIndex = routeRules.indexOfFirst { rule ->
+            (rule["rule_set"] as? JsonPrimitive)?.content == "geosite-ru-blocked"
+        }
+        val russianDomainIndex = routeRules.indexOfFirst { rule ->
+            (rule["rule_set"] as? JsonPrimitive)?.content == "geosite-category-ru"
+        }
+        val blockedIpIndex = routeRules.indexOfFirst { rule ->
+            (rule["rule_set"] as? JsonArray)?.any {
+                it.jsonPrimitive.content == "geoip-ru-blocked"
+            } == true
+        }
+        val russianIpIndex = routeRules.indexOfFirst { rule ->
+            (rule["rule_set"] as? JsonPrimitive)?.content == "geoip-ru"
+        }
+        val ipv6FallbackIndex = routeRules.indexOfFirst { rule ->
+            rule["ip_version"]?.jsonPrimitive?.content == "6"
+        }
+
+        assertTrue(insideOnlyIndex >= 0)
+        assertTrue(blockedDomainIndex > insideOnlyIndex)
+        assertTrue(ipv6FallbackIndex in 0 until insideOnlyIndex)
+        assertTrue(blockedIpIndex > blockedDomainIndex)
+        assertTrue(russianDomainIndex > blockedIpIndex)
+        assertTrue(russianIpIndex > blockedIpIndex)
+        assertFalse(routeRules.any { rule ->
+            rule["network"]?.jsonPrimitive?.content == "udp" &&
+                rule["port"]?.jsonPrimitive?.content == "443"
+        })
+        assertFalse(routeRules.any { it["action"]?.jsonPrimitive?.content == "reject" })
+        assertEquals(
+            listOf("local-dns", "remote-dns", "local-dns"),
+            dnsRules.map { it.getValue("server").jsonPrimitive.content }
+        )
+        assertEquals(
+            listOf("ipv4_only", null, "ipv4_only"),
+            dnsRules.map { it["strategy"]?.jsonPrimitive?.content }
         )
     }
 
