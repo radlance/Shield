@@ -1,11 +1,18 @@
 package com.github.radlance.shield.home.presentation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.QrCode
@@ -15,6 +22,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
@@ -30,21 +38,28 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
 import com.github.radlance.shield.R
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddMenu(
     scrollState: ScrollState,
+    expanded: Boolean,
+    canExpand: Boolean = true,
+    onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onAddSubscription: () -> Unit = {},
     onPasteFromClipboard: () -> Unit = {},
@@ -72,10 +87,7 @@ fun AddMenu(
         }
     }
 
-    val focusRequester = remember { FocusRequester() }
-    var fabMenuExpanded by rememberSaveable { mutableStateOf(false) }
-
-    BackHandler(fabMenuExpanded) { fabMenuExpanded = false }
+    BackHandler(expanded) { onExpandedChange(false) }
 
     val items =
         listOf(
@@ -87,13 +99,11 @@ fun AddMenu(
 
     FloatingActionButtonMenu(
         modifier = modifier,
-        expanded = fabMenuExpanded,
+        expanded = expanded,
         button = {
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                    if (fabMenuExpanded) {
-                        TooltipAnchorPosition.Start
-                    } else TooltipAnchorPosition.Above
+                    if (expanded) TooltipAnchorPosition.Start else TooltipAnchorPosition.Above
                 ),
                 tooltip = {
                     PlainTooltip {
@@ -105,13 +115,13 @@ fun AddMenu(
                 ToggleFloatingActionButton(
                     modifier = Modifier
                         .animateFloatingActionButton(
-                            visible = fabVisible || fabMenuExpanded,
+                            visible = fabVisible || expanded,
                             alignment = Alignment.BottomEnd,
                         )
-                        .focusRequester(focusRequester),
-                    checked = fabMenuExpanded,
-                    onCheckedChange = {
-                        fabMenuExpanded = !fabMenuExpanded
+                        .testTag(COLLAPSED_FAB_TAG),
+                    checked = expanded,
+                    onCheckedChange = { checked ->
+                        if (canExpand || !checked) onExpandedChange(checked)
                     }
                 ) {
                     val imageVector by remember {
@@ -123,7 +133,9 @@ fun AddMenu(
                     }
                     Icon(
                         painter = rememberVectorPainter(imageVector),
-                        contentDescription = null,
+                        contentDescription = stringResource(
+                            if (expanded) R.string.close_add_menu else R.string.open_add_menu
+                        ),
                         modifier = Modifier.animateIcon({ checkedProgress }),
                     )
                 }
@@ -133,7 +145,7 @@ fun AddMenu(
         items.forEach { item ->
             FloatingActionButtonMenuItem(
                 onClick = {
-                    fabMenuExpanded = false
+                    onExpandedChange(false)
                     item.third()
                 },
                 icon = { Icon(item.first, contentDescription = null) },
@@ -142,3 +154,51 @@ fun AddMenu(
         }
     }
 }
+
+@Composable
+internal fun FabMenuScrim(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissLabel: String? = null
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn(),
+        exit = fadeOut()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = SCRIM_ALPHA))
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            event.changes.forEach { change ->
+                                if (change.positionChanged()) change.consume()
+                            }
+                        }
+                    }
+                }
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClickLabel = dismissLabel,
+                    role = Role.Button,
+                    onClick = onDismiss
+                )
+                .hideFromAccessibilityIf(dismissLabel == null)
+                .testTag(SCRIM_TAG)
+        )
+    }
+}
+
+internal fun Modifier.hideFromAccessibilityIf(hidden: Boolean): Modifier =
+    if (hidden) semantics { hideFromAccessibility() } else this
+
+private const val SCRIM_ALPHA = 0.32f
+internal const val COLLAPSED_FAB_TAG = "add_menu_fab"
+internal const val SCRIM_TAG = "add_menu_scrim"

@@ -63,7 +63,10 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fabMenuExpanded: Boolean = false,
+    fabMenuCanExpand: Boolean = true,
+    onFabMenuExpandedChange: (Boolean) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -111,6 +114,7 @@ fun HomeScreen(
 
     LaunchedEffect(state.message) {
         state.message?.let {
+            onFabMenuExpandedChange(false)
             snackbarHostState.showSnackbar(it)
             viewModel.dismissMessage()
         }
@@ -119,6 +123,7 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         ImportIntentBus.values.collect { value ->
             val it = value ?: return@collect
+            onFabMenuExpandedChange(false)
             importInitialValue = it
             showImportDialog = true
             ImportIntentBus.consume()
@@ -173,7 +178,9 @@ fun HomeScreen(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .hideFromAccessibilityIf(fabMenuExpanded)
             ) {
                 ShieldControlBar(
                     isWorking = isConnected,
@@ -223,8 +230,26 @@ fun HomeScreen(
                 )
             }
 
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = MaterialTheme.spacing.xxl)
+                    .hideFromAccessibilityIf(fabMenuExpanded)
+            )
+
+            FabMenuScrim(
+                visible = fabMenuExpanded,
+                onDismiss = { onFabMenuExpandedChange(false) },
+                modifier = Modifier.fillMaxSize(),
+                dismissLabel = stringResource(R.string.close_add_menu)
+            )
+
             AddMenu(
                 scrollState = scrollState,
+                expanded = fabMenuExpanded,
+                canExpand = fabMenuCanExpand,
+                onExpandedChange = onFabMenuExpandedChange,
                 onAddSubscription = {
                     importInitialValue = ""
                     showImportDialog = true
@@ -238,13 +263,6 @@ fun HomeScreen(
                     showImportDialog = true
                 },
                 modifier = Modifier.align(Alignment.BottomEnd)
-            )
-
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = MaterialTheme.spacing.xxl)
             )
         }
     }
