@@ -145,9 +145,7 @@ class HomeViewModel(
 
     fun refreshAll() {
         viewModelScope.launch {
-            repository.refreshAll()
-                .mapNotNull(Result<Unit>::exceptionOrNull)
-                .firstOrNull()
+            repository.refreshAll().firstNotNullOfOrNull(Result<Unit>::exceptionOrNull)
                 ?.let { message.value = it.message ?: "Refresh failed" }
         }
     }

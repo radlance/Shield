@@ -125,7 +125,11 @@ fun ServerListItem(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     ) {
-        Text(item.title)
+        Text(
+            text = item.title,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
