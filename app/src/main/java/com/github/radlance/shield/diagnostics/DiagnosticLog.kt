@@ -28,7 +28,7 @@ class DiagnosticLog {
 
     private companion object {
         const val MAX_ENTRIES = 300
-        val VLESS_LINK = Regex("""vless://[^\s]+""", RegexOption.IGNORE_CASE)
+        val VLESS_LINK = Regex("""vless://\S+""", RegexOption.IGNORE_CASE)
         val UUID_VALUE = Regex("""\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b""")
         val TOKEN_QUERY = Regex("""(?i)(token|key|auth|uuid)=([^&\s]+)""")
     }

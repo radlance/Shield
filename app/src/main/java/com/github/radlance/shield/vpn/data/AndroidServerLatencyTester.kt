@@ -17,8 +17,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.net.Inet4Address
 import java.net.InetSocketAddress
-import kotlin.coroutines.coroutineContext
 import kotlin.math.ceil
+import kotlin.time.Duration.Companion.milliseconds
 
 class AndroidServerLatencyTester(
     context: Context
@@ -27,7 +27,7 @@ class AndroidServerLatencyTester(
 
     override suspend fun measure(profile: VlessProfile): Long? {
         val deadline = SystemClock.elapsedRealtime() + TIMEOUT_MILLIS
-        return withTimeoutOrNull(TIMEOUT_MILLIS) {
+        return withTimeoutOrNull(TIMEOUT_MILLIS.milliseconds) {
             val network = physicalNetwork() ?: return@withTimeoutOrNull null
             val addresses = runInterruptible(Dispatchers.IO) {
                 network.getAllByName(profile.server)
@@ -55,13 +55,17 @@ class AndroidServerLatencyTester(
         address: InetSocketAddress,
         timeoutMillis: Int
     ): Long? {
-        val socket = network.socketFactory.createSocket()
-        val cancellationHandle = coroutineContext.job.invokeOnCompletion { error ->
+        val socket = withContext(Dispatchers.IO) {
+            network.socketFactory.createSocket()
+        }
+        val cancellationHandle = currentCoroutineContext().job.invokeOnCompletion { error ->
             if (error is CancellationException) runCatching(socket::close)
         }
         return try {
             val startedAt = SystemClock.elapsedRealtimeNanos()
-            socket.connect(address, timeoutMillis)
+            withContext(Dispatchers.IO) {
+                socket.connect(address, timeoutMillis)
+            }
             ceil((SystemClock.elapsedRealtimeNanos() - startedAt) / NANOS_PER_MILLI)
                 .toLong()
                 .coerceAtLeast(1L)

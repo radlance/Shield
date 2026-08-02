@@ -58,9 +58,9 @@ import com.github.radlance.shield.R
 fun AddMenu(
     scrollState: ScrollState,
     expanded: Boolean,
+    modifier: Modifier = Modifier,
     canExpand: Boolean = true,
     onExpandedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
     onAddSubscription: () -> Unit = {},
     onPasteFromClipboard: () -> Unit = {},
     onQrCode: () -> Unit = {},

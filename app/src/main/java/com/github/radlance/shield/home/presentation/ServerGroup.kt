@@ -15,7 +15,4 @@ data class ServerGroup(
     val isRefreshing: Boolean = false,
     val isPinging: Boolean = false,
     val error: String? = null
-) {
-    val isUnavailable: Boolean
-        get() = accessStatus != SubscriptionAccessStatus.AVAILABLE
-}
+)
