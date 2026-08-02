@@ -7,6 +7,8 @@ import android.net.NetworkCapabilities
 import android.os.SystemClock
 import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.vpn.domain.ServerLatencyTester
+import com.github.radlance.shield.vpn.domain.VpnConnectionState
+import com.github.radlance.shield.vpn.domain.VpnController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -21,14 +23,18 @@ import kotlin.math.ceil
 import kotlin.time.Duration.Companion.milliseconds
 
 class AndroidServerLatencyTester(
-    context: Context
+    context: Context,
+    private val physicalNetworkMonitor: PhysicalNetworkMonitor,
+    private val vpnController: VpnController
 ) : ServerLatencyTester {
-    private val connectivity = context.getSystemService(ConnectivityManager::class.java)
+    private val connectivity = context.applicationContext
+        .getSystemService(ConnectivityManager::class.java)
 
     override suspend fun measure(profile: VlessProfile): Long? {
-        val deadline = SystemClock.elapsedRealtime() + TIMEOUT_MILLIS
-        return withTimeoutOrNull(TIMEOUT_MILLIS.milliseconds) {
-            val network = physicalNetwork() ?: return@withTimeoutOrNull null
+        val network = probeNetwork()
+            ?: return null
+        val deadline = SystemClock.elapsedRealtime() + PROBE_TIMEOUT_MILLIS
+        return withTimeoutOrNull(PROBE_TIMEOUT_MILLIS.milliseconds) {
             val addresses = runInterruptible(Dispatchers.IO) {
                 network.getAllByName(profile.server)
                     .sortedBy { it !is Inet4Address }
@@ -49,6 +55,19 @@ class AndroidServerLatencyTester(
             }
         }
     }
+
+    private suspend fun probeNetwork(): Network? {
+        if (vpnController.state.value.canUseDefaultNetworkForLatency()) {
+            connectivity.activeNetwork
+                ?.takeIf(::hasInternetCapability)
+                ?.let { return it }
+        }
+        return physicalNetworkMonitor.awaitNetwork(NETWORK_TIMEOUT_MILLIS)
+    }
+
+    private fun hasInternetCapability(network: Network): Boolean =
+        connectivity.getNetworkCapabilities(network)
+            ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
 
     private suspend fun connect(
         network: Network,
@@ -79,37 +98,19 @@ class AndroidServerLatencyTester(
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun physicalNetwork(): Network? = connectivity.allNetworks
-        .mapNotNull { network ->
-            val capabilities = connectivity.getNetworkCapabilities(network)
-                ?: return@mapNotNull null
-            if (
-                !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
-                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-            ) {
-                return@mapNotNull null
-            }
-            network to networkScore(capabilities)
-        }
-        .maxByOrNull { it.second }
-        ?.first
-
-    private fun networkScore(capabilities: NetworkCapabilities): Int {
-        val validatedScore =
-            if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) 100
-            else 0
-        val transportScore = when {
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> 30
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> 20
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> 10
-            else -> 0
-        }
-        return validatedScore + transportScore
-    }
-
     private companion object {
-        const val TIMEOUT_MILLIS = 5_000L
+        const val NETWORK_TIMEOUT_MILLIS = 5_000L
+        const val PROBE_TIMEOUT_MILLIS = 5_000L
         const val NANOS_PER_MILLI = 1_000_000.0
     }
+}
+
+private fun VpnConnectionState.canUseDefaultNetworkForLatency(): Boolean = when (this) {
+    VpnConnectionState.Disconnected,
+    VpnConnectionState.PermissionRequired,
+    is VpnConnectionState.Error -> true
+    is VpnConnectionState.Connecting,
+    is VpnConnectionState.Connected,
+    is VpnConnectionState.Reconnecting,
+    VpnConnectionState.Disconnecting -> false
 }

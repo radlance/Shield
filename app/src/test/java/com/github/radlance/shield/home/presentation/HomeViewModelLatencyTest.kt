@@ -58,8 +58,8 @@ class HomeViewModelLatencyTest {
         viewModel.pingSubscription(SUBSCRIPTION_ID)
         runCurrent()
 
-        assertEquals(32, tester.started)
-        assertEquals(32, tester.maximumActive)
+        assertEquals(8, tester.started)
+        assertEquals(8, tester.maximumActive)
         assertTrue(viewModel.uiState.value.serverLatencies.values.all {
             it == ServerLatency.Pinging
         })

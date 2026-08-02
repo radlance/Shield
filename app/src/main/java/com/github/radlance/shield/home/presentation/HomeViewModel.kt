@@ -253,6 +253,6 @@ class HomeViewModel(
     }
 
     private companion object {
-        const val MAX_CONCURRENT_PINGS = 32
+        const val MAX_CONCURRENT_PINGS = 8
     }
 }

@@ -13,6 +13,7 @@ import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.vpn.data.AndroidServerLatencyTester
 import com.github.radlance.shield.vpn.data.AndroidVpnController
 import com.github.radlance.shield.vpn.data.DataStoreVpnStateStore
+import com.github.radlance.shield.vpn.data.PhysicalNetworkMonitor
 import com.github.radlance.shield.vpn.data.SingBoxConfigGenerator
 import com.github.radlance.shield.vpn.data.VpnStateStore
 import com.github.radlance.shield.vpn.domain.ServerLatencyTester
@@ -44,7 +45,14 @@ val vpnModule = module {
         DataStoreVpnStateStore(dataStore = get(named("vpn_state")))
     }
     single<VpnController> { AndroidVpnController(androidContext()) }
-    single<ServerLatencyTester> { AndroidServerLatencyTester(androidContext()) }
+    single { PhysicalNetworkMonitor(androidContext()) }
+    single<ServerLatencyTester> {
+        AndroidServerLatencyTester(
+            context = androidContext(),
+            physicalNetworkMonitor = get(),
+            vpnController = get()
+        )
+    }
     single { RoutingRuleSetProvider(androidContext()) }
     single<RoutingSettingsRepository> {
         DataStoreRoutingSettingsRepository(get(named("routing")))

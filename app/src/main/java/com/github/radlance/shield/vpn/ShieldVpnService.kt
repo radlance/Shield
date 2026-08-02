@@ -30,6 +30,7 @@ import com.github.radlance.shield.diagnostics.DiagnosticLog
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.vpn.data.InterfaceAddressFormatter
+import com.github.radlance.shield.vpn.data.PhysicalNetworkMonitor
 import com.github.radlance.shield.vpn.data.SingBoxConfigGenerator
 import com.github.radlance.shield.vpn.data.VpnRoutingConfig
 import com.github.radlance.shield.vpn.data.VpnStateStore
@@ -87,6 +88,7 @@ class ShieldVpnService :
     private val vpnStateStore by inject<VpnStateStore>()
     private val routingSettingsRepository by inject<RoutingSettingsRepository>()
     private val routingRuleSetProvider by inject<RoutingRuleSetProvider>()
+    private val physicalNetworkMonitor by inject<PhysicalNetworkMonitor>()
     private val connectivity by lazy { getSystemService(ConnectivityManager::class.java) }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -204,6 +206,7 @@ class ShieldVpnService :
                 _connectionState.value = VpnConnectionState.Connecting(profile.name)
                 val prepared = prepareConfig(profile)
                 underlyingNetwork = findUnderlyingNetwork()
+                    ?: physicalNetworkMonitor.awaitNetwork(PHYSICAL_NETWORK_TIMEOUT_MILLIS)
                     ?: error("No usable physical network is available")
                 val server = CommandServer(this@ShieldVpnService, this@ShieldVpnService)
                 startingServer = server
@@ -511,10 +514,8 @@ class ShieldVpnService :
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     if (generation != networkMonitorGeneration.get()) return
-                    if (isUnderlyingNetwork(network)) {
-                        observedNetworks.add(network)
-                        updateDefaultInterface(selectUnderlyingNetwork())
-                    }
+                    observedNetworks.add(network)
+                    updateDefaultInterface(selectUnderlyingNetwork())
                 }
 
                 override fun onLost(network: Network) {
@@ -528,7 +529,7 @@ class ShieldVpnService :
 
                 override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
                     if (generation != networkMonitorGeneration.get()) return
-                    if (isUnderlyingNetwork(network)) {
+                    if (isUnderlyingNetwork(capabilities)) {
                         observedNetworks.add(network)
                     } else {
                         observedNetworks.remove(network)
@@ -754,10 +755,13 @@ class ShieldVpnService :
 
     private fun isUnderlyingNetwork(network: Network): Boolean {
         val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        return isUnderlyingNetwork(capabilities)
+    }
+
+    private fun isUnderlyingNetwork(capabilities: NetworkCapabilities): Boolean =
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
             capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN) &&
             !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
-    }
 
     private fun addAddresses(
         builder: Builder,
@@ -832,6 +836,7 @@ class ShieldVpnService :
         private const val NOTIFICATION_CHANNEL = "shield_vpn"
         private const val NOTIFICATION_ID = 10
         private const val RELOAD_DEBOUNCE_MILLIS = 250L
+        private const val PHYSICAL_NETWORK_TIMEOUT_MILLIS = 5_000L
         private const val DEBUG_LOG_TAG = "ShieldCore"
 
         private val _connectionState = MutableStateFlow<VpnConnectionState>(VpnConnectionState.Disconnected)
