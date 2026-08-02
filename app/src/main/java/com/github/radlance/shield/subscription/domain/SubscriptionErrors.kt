@@ -11,3 +11,7 @@ class UnsupportedSubscriptionFormatException(
 class SubscriptionDeviceLimitException(
     message: String
 ) : IllegalStateException(message)
+
+class SubscriptionAlreadyExistsException(
+    message: String = "This subscription has already been added"
+) : IllegalArgumentException(message)

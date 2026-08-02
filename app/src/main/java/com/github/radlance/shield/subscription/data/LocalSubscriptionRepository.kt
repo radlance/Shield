@@ -8,12 +8,14 @@ import com.github.radlance.shield.subscription.domain.ImportResult
 import com.github.radlance.shield.subscription.domain.ProfileParser
 import com.github.radlance.shield.subscription.domain.Subscription
 import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
+import com.github.radlance.shield.subscription.domain.SubscriptionAlreadyExistsException
 import com.github.radlance.shield.subscription.domain.SubscriptionGroup
 import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.SubscriptionSource
 import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.subscription.domain.accessStatus
+import com.github.radlance.shield.subscription.domain.isExistingSubscription
 import java.net.URI
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -59,12 +61,25 @@ class LocalSubscriptionRepository(
         name: String,
         source: SubscriptionSource
     ): Result<Subscription> = runCatching {
+        if (source is SubscriptionSource.Remote) {
+            validateSubscriptionUrl(source.url)
+            val current = state.first()
+            if (
+                isExistingSubscription(
+                    subscriptions = current.subscriptions,
+                    profiles = current.profiles,
+                    source = source,
+                    importedProfiles = emptyList()
+                )
+            ) {
+                throw SubscriptionAlreadyExistsException()
+            }
+        }
         val id = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         val payload = when (source) {
             is SubscriptionSource.Direct -> ImportPayload(body = source.link)
             is SubscriptionSource.Remote -> {
-                validateSubscriptionUrl(source.url)
                 val downloaded = downloadSubscription(source.url)
                 ImportPayload(
                     sourceUrl = source.url,
@@ -92,6 +107,16 @@ class LocalSubscriptionRepository(
             metadata = payload.metadata
         )
         mutate { current ->
+            if (
+                isExistingSubscription(
+                    subscriptions = current.subscriptions,
+                    profiles = current.profiles,
+                    source = source,
+                    importedProfiles = parsed.profiles
+                )
+            ) {
+                throw SubscriptionAlreadyExistsException()
+            }
             current.copy(
                 subscriptions = listOf(subscription) + current.subscriptions,
                 profiles = current.profiles + parsed.profiles,
