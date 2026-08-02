@@ -15,7 +15,6 @@
     <string name="back">Back</string>
     <string name="flashlight_on">Turn flashlight on</string>
     <string name="flashlight_off">Turn flashlight off</string>
-    <string name="manual_input">Manual input</string>
     <string name="open_add_menu">Open add menu</string>
     <string name="close_add_menu">Close add menu</string>
     <string name="empty_server_list">Server list is empty</string>

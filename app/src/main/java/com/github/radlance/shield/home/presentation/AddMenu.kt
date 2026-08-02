@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Subscriptions
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,8 +62,7 @@ fun AddMenu(
     onExpandedChange: (Boolean) -> Unit,
     onAddSubscription: () -> Unit = {},
     onPasteFromClipboard: () -> Unit = {},
-    onQrCode: () -> Unit = {},
-    onManualInput: () -> Unit = {}
+    onQrCode: () -> Unit = {}
 ) {
     var isScrollingUp by remember { mutableStateOf(true) }
 
@@ -94,7 +92,6 @@ fun AddMenu(
             Triple(Icons.Filled.Subscriptions, R.string.add_subscription, onAddSubscription),
             Triple(Icons.Filled.ContentPaste, R.string.paste_from_clipboard, onPasteFromClipboard),
             Triple(Icons.Filled.QrCode, R.string.qr_code, onQrCode),
-            Triple(Icons.Filled.Edit, R.string.manual_input, onManualInput),
         )
 
     FloatingActionButtonMenu(

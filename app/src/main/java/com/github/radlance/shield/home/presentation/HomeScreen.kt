@@ -258,10 +258,6 @@ fun HomeScreen(
                 onQrCode = {
                     qrScannerLauncher.launch(QrScannerActivity.createIntent(context))
                 },
-                onManualInput = {
-                    importInitialValue = "vless://"
-                    showImportDialog = true
-                },
                 modifier = Modifier.align(Alignment.BottomEnd)
             )
         }
