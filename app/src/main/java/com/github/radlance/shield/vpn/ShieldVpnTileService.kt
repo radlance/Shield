@@ -20,6 +20,7 @@ import com.github.radlance.shield.subscription.domain.SubscriptionGroup
 import com.github.radlance.shield.subscription.domain.accessStatus
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
 import com.github.radlance.shield.vpn.domain.VpnController
+import com.github.radlance.shield.vpn.domain.VpnTileLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -150,7 +151,10 @@ class ShieldVpnTileService : TileService() {
             !canActivate -> Tile.STATE_UNAVAILABLE
             else -> Tile.STATE_INACTIVE
         }
-        tile.label = getString(R.string.quick_settings_vpn)
+        tile.label = VpnTileLabel.forState(
+            state = state,
+            fallback = getString(R.string.quick_settings_vpn)
+        )
         tile.icon = Icon.createWithResource(this, R.drawable.shield_24px)
         tile.updateTile()
     }
