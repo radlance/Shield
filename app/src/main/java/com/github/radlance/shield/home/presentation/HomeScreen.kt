@@ -120,7 +120,7 @@ fun HomeScreen(
     LaunchedEffect(state.message) {
         state.message?.let {
             onFabMenuExpandedChange(false)
-            snackbarHostState.showSnackbar(it)
+            snackbarHostState.showSnackbar(localizeHomeMessage(context, it))
             viewModel.dismissMessage()
         }
     }
@@ -170,7 +170,7 @@ fun HomeScreen(
             },
             isRefreshing = group.subscription.id in state.busySubscriptionIds,
             isPinging = group.subscription.id in state.pingingSubscriptionIds,
-            error = group.subscription.lastError
+            error = group.subscription.lastError?.let { localizeHomeMessage(context, it) }
         )
     }
 
@@ -450,14 +450,33 @@ private fun ConnectionStatusText(connectionState: VpnConnectionState) {
     )
 }
 
+@Composable
 private fun connectionLabel(state: VpnConnectionState): String = when (state) {
-    VpnConnectionState.Disconnected -> "Disconnected"
-    VpnConnectionState.PermissionRequired -> "VPN permission required"
-    is VpnConnectionState.Connecting -> "Connecting to ${state.profileName}"
-    is VpnConnectionState.Connected -> "Connected to ${state.profileName}"
-    is VpnConnectionState.Reconnecting -> "Reconnecting to ${state.profileName}"
-    VpnConnectionState.Disconnecting -> "Disconnecting"
-    is VpnConnectionState.Error -> state.message
+    VpnConnectionState.Disconnected -> stringResource(R.string.connection_disconnected)
+    VpnConnectionState.PermissionRequired -> stringResource(R.string.connection_permission_required)
+    is VpnConnectionState.Connecting -> stringResource(
+        R.string.connection_connecting,
+        state.profileName
+    )
+    is VpnConnectionState.Connected -> stringResource(
+        R.string.connection_connected,
+        state.profileName
+    )
+    is VpnConnectionState.Reconnecting -> stringResource(
+        R.string.connection_reconnecting,
+        state.profileName
+    )
+    VpnConnectionState.Disconnecting -> stringResource(R.string.connection_disconnecting)
+    is VpnConnectionState.Error -> stringResource(R.string.connection_error, state.message)
+}
+
+private fun localizeHomeMessage(context: Context, message: String): String = when (message) {
+    "Import failed" -> context.getString(R.string.import_failed)
+    "Refresh failed" -> context.getString(R.string.refresh_failed)
+    "The subscription has expired" -> context.getString(R.string.subscription_expired)
+    "The subscription traffic limit has been reached" ->
+        context.getString(R.string.subscription_traffic_exhausted)
+    else -> message
 }
 
 private data class ConnectionStatus(

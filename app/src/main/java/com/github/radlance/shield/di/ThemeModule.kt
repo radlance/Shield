@@ -1,6 +1,7 @@
 package com.github.radlance.shield.di
 
 import com.github.radlance.shield.uikit.theme.core.ThemeViewModel
+import com.github.radlance.shield.localization.LanguageViewModel
 import com.github.radlance.shield.uikit.theme.data.BaseThemeDataStore
 import com.github.radlance.shield.uikit.theme.data.LocalThemeRepository
 import com.github.radlance.shield.uikit.theme.data.ThemeDataStore
@@ -19,4 +20,5 @@ val themeModule = module {
     }
     singleOf(::LocalThemeRepository).bind<ThemeRepository>()
     viewModelOf(::ThemeViewModel)
+    viewModelOf(::LanguageViewModel)
 }

@@ -225,7 +225,7 @@ fun CollapsibleServerList(
                                 } else {
                                     Icon(
                                         imageVector = Icons.Rounded.Refresh,
-                                        contentDescription = "Refresh",
+                                        contentDescription = stringResource(R.string.refresh),
                                         modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -255,7 +255,9 @@ fun CollapsibleServerList(
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            contentDescription = stringResource(
+                                if (isExpanded) R.string.collapse else R.string.expand
+                            ),
                             modifier = Modifier
                                 .size(MaterialTheme.icons.medium)
                                 .graphicsLayer { rotationZ = rotationAngle },

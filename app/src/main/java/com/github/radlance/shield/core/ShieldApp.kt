@@ -1,12 +1,14 @@
 package com.github.radlance.shield.core
 
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import com.github.radlance.shield.BuildConfig
 import com.github.radlance.shield.di.alertModule
 import com.github.radlance.shield.di.dataStoreModule
 import com.github.radlance.shield.di.themeModule
 import com.github.radlance.shield.di.vpnModule
+import com.github.radlance.shield.localization.LanguageManager
 import com.github.radlance.shield.subscription.data.SubscriptionRefreshWorker
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.SetupOptions
@@ -16,6 +18,10 @@ import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 
 class ShieldApp : Application() {
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(LanguageManager(base).localizedContext(base))
+    }
 
     override fun onCreate() {
         super.onCreate()

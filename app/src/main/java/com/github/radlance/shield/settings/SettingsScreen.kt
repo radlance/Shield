@@ -7,10 +7,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.activity.compose.LocalActivity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Contrast
 import androidx.compose.material.icons.rounded.Dns
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Palette
@@ -37,6 +37,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.radlance.shield.R
 import com.github.radlance.shield.alerts.domain.AlertsRepository
 import com.github.radlance.shield.home.presentation.HomeViewModel
+import com.github.radlance.shield.localization.LanguageViewModel
+import com.github.radlance.shield.settings.components.LanguageSelector
 import com.github.radlance.shield.settings.components.SettingsListItem
 import com.github.radlance.shield.settings.components.SettingsSectionHeader
 import com.github.radlance.shield.settings.components.SettingsSwitchItem
@@ -55,7 +57,10 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val routingViewModel = koinViewModel<RoutingSettingsViewModel>()
+    val languageViewModel = koinViewModel<LanguageViewModel>()
     val routingState by routingViewModel.uiState.collectAsStateWithLifecycle()
+    val selectedLanguage by languageViewModel.selectedLanguage.collectAsStateWithLifecycle()
+    val activity = LocalActivity.current
     val alerts = koinInject<AlertsRepository>()
     val alertConfiguration by alerts.alertConfiguration.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -139,6 +144,19 @@ fun SettingsScreen(
                     val enabled = !alertConfiguration.hapticsEnabled
                     if (alertConfiguration.hapticsEnabled) feedback()
                     scope.launch { alerts.setHapticsEnabled(enabled) }
+                }
+            )
+        }
+
+        item {
+            LanguageSelector(
+                selectedLanguage = selectedLanguage,
+                onLanguageSelected = { language ->
+                    if (language != selectedLanguage) {
+                        feedback()
+                        languageViewModel.setLanguage(language)
+                        activity?.recreate()
+                    }
                 }
             )
         }

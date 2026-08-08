@@ -1,6 +1,7 @@
 package com.github.radlance.shield.core
 
 import android.content.Intent
+import android.content.Context
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -21,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.github.radlance.shield.home.presentation.HomeViewModel
+import com.github.radlance.shield.localization.LanguageManager
 import com.github.radlance.shield.navigation.core.AppNavHost
 import com.github.radlance.shield.subscription.presentation.ImportIntentBus
 import com.github.radlance.shield.uikit.theme.core.ThemeViewModel
@@ -33,6 +35,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration.Companion.milliseconds
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(LanguageManager(base).localizedContext(base))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleImportIntent(intent)

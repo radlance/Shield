@@ -104,7 +104,9 @@ fun AddMenu(
                 ),
                 tooltip = {
                     PlainTooltip {
-                        Text(text = "Add menu")
+                        Text(text = stringResource(
+                            if (expanded) R.string.close_add_menu else R.string.open_add_menu)
+                        )
                     }
                 },
                 state = rememberTooltipState()

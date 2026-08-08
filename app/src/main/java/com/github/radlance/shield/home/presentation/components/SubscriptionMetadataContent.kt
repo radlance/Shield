@@ -43,8 +43,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.github.radlance.shield.R
 import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
 import com.github.radlance.shield.uikit.tokens.icons
@@ -204,7 +206,7 @@ private fun ProviderActions(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Language,
-                    contentDescription = "Website"
+                    contentDescription = stringResource(R.string.website)
                 )
             }
         }
@@ -216,7 +218,7 @@ private fun ProviderActions(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.SupportAgent,
-                    contentDescription = "Support"
+                    contentDescription = stringResource(R.string.support)
                 )
             }
         }
@@ -325,9 +327,12 @@ internal fun SubscriptionMetadata.needsAttention(): Boolean {
     return used.toDouble() / total >= 0.8
 }
 
+@Composable
 internal fun subscriptionSummary(metadata: SubscriptionMetadata): String? {
     val expiry = metadata.expiresAtEpochSeconds?.let(::formatEpochSeconds)
-    val updateInterval = metadata.updateIntervalHours?.let { "Every $it h" }
+    val updateInterval = metadata.updateIntervalHours?.let {
+        stringResource(R.string.subscription_update_interval, it)
+    }
     return listOfNotNull(expiry, updateInterval)
         .joinToString(" | ")
         .takeIf(String::isNotBlank)

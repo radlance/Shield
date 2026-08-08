@@ -48,6 +48,11 @@ android {
             isUniversalApk = true
         }
     }
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 dependencies {

@@ -118,7 +118,7 @@ fun DiagnosticsScreen(
 private fun shareLogs(context: Context, logs: String, chooserTitle: String) {
     context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
-        putExtra(Intent.EXTRA_SUBJECT, "Shield diagnostics")
+        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.diagnostics_share_subject))
         putExtra(Intent.EXTRA_TEXT, logs)
     }, chooserTitle))
 }

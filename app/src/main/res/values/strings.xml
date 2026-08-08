@@ -69,8 +69,12 @@
     <string name="amoled_available_dark">Available in dark mode</string>
     <string name="app_font">App font</string>
     <string name="color_theme">Color theme</string>
-    <string name="selected">Selected</string>
+    <string name="selected_theme">Selected</string>
     <string name="audio_haptics">Audio &amp; Haptics</string>
+    <string name="language">Language</string>
+    <string name="language_system">System default</string>
+    <string name="language_english">English</string>
+    <string name="language_russian">Русский</string>
     <string name="haptic_feedback">Haptic feedback</string>
     <string name="haptic_feedback_description">Feel important actions</string>
     <string name="open_appearance">Customize theme and font</string>
@@ -83,4 +87,22 @@
     <string name="about_version_label">Version</string>
     <string name="about_engine_label">Engine</string>
     <string name="about_license_label">License</string>
+    <string name="connection_disconnected">Disconnected</string>
+    <string name="connection_permission_required">VPN permission required</string>
+    <string name="connection_connecting">Connecting to %1$s</string>
+    <string name="connection_connected">Connected to %1$s</string>
+    <string name="connection_reconnecting">Reconnecting to %1$s</string>
+    <string name="connection_disconnecting">Disconnecting</string>
+    <string name="connection_error">Error: %1$s</string>
+    <string name="diagnostics_share_subject">Shield diagnostics</string>
+    <string name="website">Website</string>
+    <string name="support">Support</string>
+    <string name="refresh">Refresh</string>
+    <string name="collapse">Collapse</string>
+    <string name="expand">Expand</string>
+    <string name="subscription_update_interval">Every %1$d h</string>
+    <string name="import_failed">Import failed</string>
+    <string name="refresh_failed">Refresh failed</string>
+    <string name="subscription_expired">The subscription has expired</string>
+    <string name="subscription_traffic_exhausted">The subscription traffic limit has been reached</string>
 </resources>

@@ -53,7 +53,7 @@ fun ThemeCard(option: ThemeOption, selected: Boolean, onClick: () -> Unit) {
             Box(modifier = Modifier.size(MaterialTheme.icons.large).clip(CircleShape).background(Brush.linearGradient(option.gradientColors)), contentAlignment = Alignment.Center) {
                 if (selected) {
                     Surface(modifier = Modifier.size(MaterialTheme.icons.mediumSmall), shape = CircleShape, color = MaterialTheme.colorScheme.onPrimary) {
-                        Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.selected), tint = option.primaryColor, modifier = Modifier.padding(MaterialTheme.spacing.xxs))
+                        Icon(Icons.Rounded.Check, contentDescription = stringResource(R.string.selected_theme), tint = option.primaryColor, modifier = Modifier.padding(MaterialTheme.spacing.xxs))
                     }
                 }
             }
