@@ -47,6 +47,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.radlance.shield.R
+import com.github.radlance.shield.alerts.domain.AlertsRepository
 import com.github.radlance.shield.qr.QrScannerActivity
 import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.ProxyProfile
@@ -59,6 +60,7 @@ import com.github.radlance.shield.uikit.tokens.spacing
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -71,6 +73,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val alerts = koinInject<AlertsRepository>()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
@@ -81,6 +84,7 @@ fun HomeScreen(
     }
     val permissionDeniedMessage = stringResource(R.string.vpn_permission_denied)
     val onPasteFromClipboard: () -> Unit = {
+        alerts.onFocusChanged()
         clipboardText(context)?.let { viewModel.import("", it) }
     }
 
@@ -148,10 +152,17 @@ fun HomeScreen(
                 )
             },
             onRefresh = group.subscription.sourceUrl?.let {
-                { viewModel.refresh(group.subscription.id) }
+                {
+                    alerts.onFocusChanged()
+                    viewModel.refresh(group.subscription.id)
+                }
             },
-            onPing = { viewModel.pingSubscription(group.subscription.id) },
+            onPing = {
+                alerts.onFocusChanged()
+                viewModel.pingSubscription(group.subscription.id)
+            },
             onDelete = {
+                alerts.onFocusChanged()
                 subscriptionPendingDeletion = SubscriptionPendingDeletion(
                     id = group.subscription.id,
                     name = group.subscription.name
@@ -191,6 +202,7 @@ fun HomeScreen(
                         ),
                     connectedAtElapsedRealtime = connectedState?.connectedAtElapsedRealtime,
                     onStartStop = {
+                        alerts.onFocusChanged()
                         if (isConnected) {
                             viewModel.disconnect()
                         } else {
@@ -221,9 +233,13 @@ fun HomeScreen(
                     groups = groups,
                     isLoading = state.isImporting,
                     selectedId = state.selectedProfileId,
-                    onServerSelected = viewModel::selectProfile,
+                    onServerSelected = { profileId ->
+                        alerts.onFocusChanged()
+                        viewModel.selectProfile(profileId)
+                    },
                     onPasteFromClipboard = onPasteFromClipboard,
                     onQrCodeClick = {
+                        alerts.onFocusChanged()
                         qrScannerLauncher.launch(QrScannerActivity.createIntent(context))
                     },
                     scrollState = scrollState,
@@ -252,11 +268,13 @@ fun HomeScreen(
                 canExpand = fabMenuCanExpand,
                 onExpandedChange = onFabMenuExpandedChange,
                 onAddSubscription = {
+                    alerts.onFocusChanged()
                     importInitialValue = ""
                     showImportDialog = true
                 },
                 onPasteFromClipboard = onPasteFromClipboard,
                 onQrCode = {
+                    alerts.onFocusChanged()
                     qrScannerLauncher.launch(QrScannerActivity.createIntent(context))
                 },
                 modifier = Modifier.align(Alignment.BottomEnd)
@@ -270,6 +288,7 @@ fun HomeScreen(
             importing = state.isImporting,
             onDismiss = { showImportDialog = false },
             onImport = { name, value ->
+                alerts.onFocusChanged()
                 viewModel.import(name, value)
                 showImportDialog = false
             }
@@ -280,6 +299,7 @@ fun HomeScreen(
         DeleteSubscriptionDialog(
             subscriptionName = subscription.name,
             onConfirm = {
+                alerts.onFocusChanged()
                 subscriptionPendingDeletion = null
                 viewModel.delete(subscription.id)
             },

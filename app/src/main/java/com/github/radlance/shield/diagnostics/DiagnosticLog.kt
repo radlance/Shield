@@ -21,6 +21,11 @@ class DiagnosticLog {
 
     fun export(): String = entries.joinToString("\n")
 
+    fun clear() {
+        entries.clear()
+        _lines.value = emptyList()
+    }
+
     internal fun redact(value: String): String = value
         .replace(PROXY_LINK, "$1://[redacted]")
         .replace(UUID_VALUE, "[uuid]")

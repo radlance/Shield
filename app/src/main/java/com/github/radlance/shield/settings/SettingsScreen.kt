@@ -1,45 +1,47 @@
 package com.github.radlance.shield.settings
 
-import android.content.Intent
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.Contrast
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Route
+import androidx.compose.material.icons.rounded.Troubleshoot
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.radlance.shield.R
-import com.github.radlance.shield.diagnostics.DiagnosticLog
+import com.github.radlance.shield.alerts.domain.AlertsRepository
 import com.github.radlance.shield.home.presentation.HomeViewModel
+import com.github.radlance.shield.settings.components.SettingsListItem
+import com.github.radlance.shield.settings.components.SettingsSectionHeader
+import com.github.radlance.shield.settings.components.SettingsSwitchItem
 import com.github.radlance.shield.uikit.tokens.spacing
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -47,154 +49,144 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun SettingsScreen(
     homeViewModel: HomeViewModel,
+    onAppearance: () -> Unit,
+    onDiagnostics: () -> Unit,
+    onAbout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val log = koinInject<DiagnosticLog>()
     val routingViewModel = koinViewModel<RoutingSettingsViewModel>()
-    val lines by log.lines.collectAsStateWithLifecycle()
     val routingState by routingViewModel.uiState.collectAsStateWithLifecycle()
-    val shareTitle = stringResource(R.string.share_logs)
+    val alerts = koinInject<AlertsRepository>()
+    val alertConfiguration by alerts.alertConfiguration.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     var editingDirectDomains by rememberSaveable { mutableStateOf<Boolean?>(null) }
 
-    Column(
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.m),
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(MaterialTheme.spacing.m)
+    fun feedback() = alerts.onFocusChanged()
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = MaterialTheme.spacing.m,
+            end = MaterialTheme.spacing.m,
+            bottom = MaterialTheme.spacing.s
+        ),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
     ) {
-        Button(
-            onClick = homeViewModel::refreshAll,
-            shapes = ButtonDefaults.shapes(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Rounded.Refresh, contentDescription = null)
-            Text(
-                text = stringResource(R.string.refresh_subscriptions),
-                modifier = Modifier.padding(start = MaterialTheme.spacing.s)
+        item { SettingsSectionHeader(Icons.Rounded.Refresh, stringResource(R.string.subscriptions)) }
+        item {
+            SettingsListItem(
+                title = stringResource(R.string.refresh_subscriptions),
+                subtitle = stringResource(R.string.refresh_subscriptions_description),
+                leadingIcon = Icons.Rounded.Refresh,
+                index = 0,
+                totalCount = 1,
+                showChevron = false,
+                onClick = { feedback(); homeViewModel.refreshAll() }
             )
         }
 
-        Text(
-            text = stringResource(R.string.routing),
-            style = MaterialTheme.typography.titleMedium
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                    routingViewModel.setSmartRussianRouting(
-                        !routingState.smartRussianRouting
-                    )
-                }
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.smart_russian_routing),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = stringResource(R.string.smart_russian_routing_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
+        item { SettingsSectionHeader(Icons.Rounded.Route, stringResource(R.string.routing)) }
+        item {
+            SettingsSwitchItem(
+                title = stringResource(R.string.smart_russian_routing),
+                subtitle = stringResource(R.string.smart_russian_routing_description),
                 checked = routingState.smartRussianRouting,
-                onCheckedChange = routingViewModel::setSmartRussianRouting
+                index = 0,
+                totalCount = 3,
+                onCheckedChange = { enabled -> feedback(); routingViewModel.setSmartRussianRouting(enabled) },
+                onClick = { feedback(); routingViewModel.setSmartRussianRouting(!routingState.smartRussianRouting) }
             )
         }
-        OutlinedButton(
-            onClick = { editingDirectDomains = true },
-            shapes = ButtonDefaults.shapes(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = stringResource(
-                    R.string.always_direct_domains_count,
-                    routingState.forceDirectDomains.size
-                )
+        item {
+            SettingsListItem(
+                title = stringResource(R.string.always_direct_domains),
+                subtitle = stringResource(R.string.always_direct_domains_count, routingState.forceDirectDomains.size),
+                leadingIcon = Icons.Rounded.Dns,
+                index = 1,
+                totalCount = 3,
+                showChevron = false,
+                onClick = { feedback(); editingDirectDomains = true }
             )
         }
-        OutlinedButton(
-            onClick = { editingDirectDomains = false },
-            shapes = ButtonDefaults.shapes(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = stringResource(
-                    R.string.always_proxy_domains_count,
-                    routingState.forceProxyDomains.size
-                )
+        item {
+            SettingsListItem(
+                title = stringResource(R.string.always_proxy_domains),
+                subtitle = stringResource(R.string.always_proxy_domains_count, routingState.forceProxyDomains.size),
+                leadingIcon = Icons.Rounded.Block,
+                index = 2,
+                totalCount = 3,
+                showChevron = false,
+                onClick = { feedback(); editingDirectDomains = false }
             )
         }
-        Text(
-            text = stringResource(R.string.routing_reconnect_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        item {
+            Text(stringResource(R.string.routing_reconnect_hint), style = androidx.compose.material3.MaterialTheme.typography.bodySmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = MaterialTheme.spacing.xs, bottom = MaterialTheme.spacing.s))
+        }
 
-        Text(
-            text = stringResource(R.string.diagnostics),
-            style = MaterialTheme.typography.titleMedium
-        )
-        Text(
-            text = lines.takeLast(100).joinToString("\n")
-                .ifBlank { stringResource(R.string.no_diagnostics) },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        OutlinedButton(
-            enabled = lines.isNotEmpty(),
-            onClick = {
-                context.startActivity(
-                    Intent.createChooser(
-                        Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, "Shield diagnostics")
-                            putExtra(Intent.EXTRA_TEXT, log.export())
-                        },
-                        shareTitle
-                    )
-                )
-            },
-            shapes = ButtonDefaults.shapes(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Rounded.Share, contentDescription = null)
-            Text(
-                text = stringResource(R.string.share_logs),
-                modifier = Modifier.padding(start = MaterialTheme.spacing.s)
+        item { SettingsSectionHeader(Icons.AutoMirrored.Rounded.VolumeUp, stringResource(R.string.audio_haptics)) }
+        item {
+            SettingsSwitchItem(
+                title = stringResource(R.string.haptic_feedback),
+                subtitle = stringResource(R.string.haptic_feedback_description),
+                checked = alertConfiguration.hapticsEnabled,
+                index = 0,
+                totalCount = 1,
+                onCheckedChange = { enabled ->
+                    if (alertConfiguration.hapticsEnabled) feedback()
+                    scope.launch { alerts.setHapticsEnabled(enabled) }
+                },
+                onClick = {
+                    val enabled = !alertConfiguration.hapticsEnabled
+                    if (alertConfiguration.hapticsEnabled) feedback()
+                    scope.launch { alerts.setHapticsEnabled(enabled) }
+                }
             )
         }
 
-        Text(
-            text = stringResource(R.string.about_shield),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "sing-box 1.13.12 · GPL-3.0-or-later",
-            style = MaterialTheme.typography.labelMedium
-        )
+        item { SettingsSectionHeader(Icons.Rounded.Troubleshoot, stringResource(R.string.diagnostics)) }
+        item {
+            SettingsListItem(
+                title = stringResource(R.string.diagnostics),
+                subtitle = stringResource(R.string.open_diagnostics),
+                leadingIcon = Icons.Rounded.Troubleshoot,
+                index = 0,
+                totalCount = 1,
+                onClick = { feedback(); onDiagnostics() }
+            )
+        }
+
+        item { SettingsSectionHeader(Icons.Rounded.Palette, stringResource(R.string.appearance)) }
+        item {
+            SettingsListItem(
+                title = stringResource(R.string.appearance),
+                subtitle = stringResource(R.string.open_appearance),
+                leadingIcon = Icons.Rounded.Palette,
+                index = 0,
+                totalCount = 1,
+                onClick = { feedback(); onAppearance() }
+            )
+        }
+
+        item { SettingsSectionHeader(Icons.Rounded.Info, stringResource(R.string.about)) }
+        item {
+            SettingsListItem(
+                title = stringResource(R.string.about_app),
+                subtitle = stringResource(R.string.about_shield),
+                leadingIcon = Icons.Rounded.Info,
+                index = 0,
+                totalCount = 1,
+                onClick = { feedback(); onAbout() }
+            )
+        }
     }
 
     editingDirectDomains?.let { direct ->
         DomainOverridesDialog(
             direct = direct,
-            initialDomains = if (direct) {
-                routingState.forceDirectDomains
-            } else {
-                routingState.forceProxyDomains
-            },
+            initialDomains = if (direct) routingState.forceDirectDomains else routingState.forceProxyDomains,
             onSave = { domains ->
-                if (direct) {
-                    routingViewModel.setForceDirectDomains(domains)
-                } else {
-                    routingViewModel.setForceProxyDomains(domains)
-                }
+                feedback()
+                if (direct) routingViewModel.setForceDirectDomains(domains) else routingViewModel.setForceProxyDomains(domains)
                 editingDirectDomains = null
             },
             onDismiss = { editingDirectDomains = null }
@@ -210,60 +202,19 @@ private fun DomainOverridesDialog(
     onSave: (Set<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var value by rememberSaveable(direct, initialDomains) {
-        mutableStateOf(initialDomains.sorted().joinToString("\n"))
-    }
-
+    var value by rememberSaveable(direct, initialDomains) { mutableStateOf(initialDomains.sorted().joinToString("\n")) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(
-                    if (direct) R.string.always_direct_domains
-                    else R.string.always_proxy_domains
-                )
-            )
-        },
+        title = { Text(stringResource(if (direct) R.string.always_direct_domains else R.string.always_proxy_domains)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s)) {
-                Text(
-                    text = stringResource(R.string.domain_overrides_description),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { value = it },
-                    label = { Text(stringResource(R.string.domains)) },
-                    minLines = 5,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 420.dp)
-                )
+            androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.s)) {
+                Text(stringResource(R.string.domain_overrides_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text(stringResource(R.string.domains)) }, minLines = 5, modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp))
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    onSave(
-                        value.split('\n', ',', ';')
-                            .map(String::trim)
-                            .filter(String::isNotEmpty)
-                            .toSet()
-                    )
-                },
-                shapes = ButtonDefaults.shapes()
-            ) {
-                Text(stringResource(R.string.save))
-            }
+            TextButton(onClick = { onSave(value.split('\n', ',', ';').map(String::trim).filter(String::isNotEmpty).toSet()) }, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.save)) }
         },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                shapes = ButtonDefaults.shapes()
-            ) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+        dismissButton = { TextButton(onClick = onDismiss, shapes = ButtonDefaults.shapes()) { Text(stringResource(R.string.cancel)) } }
     )
 }

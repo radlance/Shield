@@ -16,4 +16,16 @@ class DiagnosticLogTest {
         assertFalse(redacted.contains("secret"))
         assertTrue(redacted.contains("[redacted]"))
     }
+
+    @Test
+    fun clearRemovesEntriesAndExport() {
+        val log = DiagnosticLog()
+        log.record("first")
+        log.record("second")
+
+        log.clear()
+
+        assertTrue(log.lines.value.isEmpty())
+        assertTrue(log.export().isEmpty())
+    }
 }

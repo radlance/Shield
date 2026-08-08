@@ -39,6 +39,9 @@ private val bottomNavItems = listOf(Home, Settings)
 @Composable
 fun MainScreen(
     homeViewModel: HomeViewModel,
+    onAppearance: () -> Unit,
+    onDiagnostics: () -> Unit,
+    onAbout: () -> Unit,
     onExit: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -141,6 +144,9 @@ fun MainScreen(
 
                 Settings -> SettingsScreen(
                     homeViewModel = homeViewModel,
+                    onAppearance = onAppearance,
+                    onDiagnostics = onDiagnostics,
+                    onAbout = onAbout,
                     modifier = Modifier.hideFromAccessibilityIf(fabMenuExpanded)
                 )
             }

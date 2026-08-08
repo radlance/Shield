@@ -27,6 +27,7 @@ fun AppNavHost(
         modifier = modifier
     ) {
         dashGraph(
+            navController = navController,
             context = context,
             homeViewModel = homeViewModel
         )
