@@ -28,7 +28,7 @@ import com.github.radlance.shield.R
 import com.github.radlance.shield.core.MainActivity
 import com.github.radlance.shield.diagnostics.DiagnosticLog
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
-import com.github.radlance.shield.subscription.domain.VlessProfile
+import com.github.radlance.shield.subscription.domain.ProxyProfile
 import com.github.radlance.shield.vpn.data.InterfaceAddressFormatter
 import com.github.radlance.shield.vpn.data.PhysicalNetworkMonitor
 import com.github.radlance.shield.vpn.data.SingBoxConfigGenerator
@@ -314,7 +314,7 @@ class ShieldVpnService :
         runCatching { ShieldVpnTileService.requestTileUpdate(this) }
     }
 
-    private suspend fun prepareConfig(profile: VlessProfile): PreparedConfig {
+    private suspend fun prepareConfig(profile: ProxyProfile): PreparedConfig {
         val settings = routingSettingsRepository.settings.first()
         val ruleSetPaths = if (settings.smartRussianRouting) {
             routingRuleSetProvider.prepareRuleSets()

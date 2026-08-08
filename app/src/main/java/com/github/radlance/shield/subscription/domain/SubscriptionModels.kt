@@ -52,13 +52,15 @@ fun SubscriptionMetadata.accessStatus(nowEpochSeconds: Long): SubscriptionAccess
 }
 
 @Serializable
-data class VlessProfile(
+data class ProxyProfile(
     val id: String,
     val subscriptionId: String,
     val name: String,
     val server: String,
     val port: Int,
-    val uuid: String,
+    val uuid: String = "",
+    val protocol: ProxyProtocol = ProxyProtocol.VLESS,
+    val outboundJson: String? = null,
     val transport: VlessTransport = VlessTransport.TCP,
     val security: VlessSecurity = VlessSecurity.NONE,
     val flow: String? = null,
@@ -72,6 +74,23 @@ data class VlessProfile(
     val grpcServiceName: String? = null,
     val packetEncoding: String? = null
 )
+
+typealias VlessProfile = ProxyProfile
+
+@Serializable
+enum class ProxyProtocol {
+    VLESS,
+    VMESS,
+    TROJAN,
+    SHADOWSOCKS,
+    HYSTERIA2,
+    TUIC
+}
+
+fun String.isSupportedProxyLink(): Boolean =
+    substringBefore(':').lowercase() in setOf(
+        "vless", "vmess", "trojan", "ss", "hysteria2", "hy2", "tuic"
+    ) && substringAfter(':', "").startsWith("//")
 
 @Serializable
 enum class VlessTransport {
@@ -89,11 +108,11 @@ enum class VlessSecurity {
 
 data class SubscriptionGroup(
     val subscription: Subscription,
-    val profiles: List<VlessProfile>
+    val profiles: List<ProxyProfile>
 )
 
 data class ImportResult(
-    val profiles: List<VlessProfile>,
+    val profiles: List<ProxyProfile>,
     val rejectedEntries: Int,
     val unsupportedTransports: Set<String> = emptySet()
 )

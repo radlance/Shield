@@ -49,7 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.radlance.shield.R
 import com.github.radlance.shield.qr.QrScannerActivity
 import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
-import com.github.radlance.shield.subscription.domain.VlessProfile
+import com.github.radlance.shield.subscription.domain.ProxyProfile
+import com.github.radlance.shield.subscription.domain.ProxyProtocol
 import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
 import com.github.radlance.shield.subscription.domain.accessStatus
@@ -140,7 +141,7 @@ fun HomeScreen(
             items = group.profiles.map { profile ->
                 ServerItem(
                     id = profile.id,
-                    leadingIcon = transportIcon(profile.transport),
+                    leadingIcon = profileIcon(profile),
                     title = profile.name,
                     description = profileDescription(profile),
                     latency = state.serverLatencies[profile.id] ?: ServerLatency.Idle
@@ -444,22 +445,33 @@ private data class ConnectionStatus(
     val isError: Boolean
 )
 
-private fun transportIcon(transport: VlessTransport): String = when (transport) {
-    VlessTransport.TCP -> "T"
-    VlessTransport.WEBSOCKET -> "W"
-    VlessTransport.GRPC -> "G"
+private fun profileIcon(profile: ProxyProfile): String = when (profile.protocol) {
+    ProxyProtocol.VLESS -> when (profile.transport) {
+        VlessTransport.TCP -> "V"
+        VlessTransport.WEBSOCKET -> "W"
+        VlessTransport.GRPC -> "G"
+    }
+    ProxyProtocol.VMESS -> "M"
+    ProxyProtocol.TROJAN -> "T"
+    ProxyProtocol.SHADOWSOCKS -> "S"
+    ProxyProtocol.HYSTERIA2 -> "H"
+    ProxyProtocol.TUIC -> "U"
 }
 
-private fun profileDescription(profile: VlessProfile): String =
+private fun profileDescription(profile: ProxyProfile): String =
     buildString {
         append(profile.server)
         append(':')
         append(profile.port)
         append(" · ")
-        append(profile.transport.name)
-        if (profile.security != VlessSecurity.NONE) {
+        append(profile.protocol.name)
+        if (profile.protocol == ProxyProtocol.VLESS) {
             append(" · ")
-            append(profile.security.name)
+            append(profile.transport.name)
+            if (profile.security != VlessSecurity.NONE) {
+                append(" · ")
+                append(profile.security.name)
+            }
         }
     }
 

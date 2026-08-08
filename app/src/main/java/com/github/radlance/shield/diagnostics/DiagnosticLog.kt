@@ -22,13 +22,16 @@ class DiagnosticLog {
     fun export(): String = entries.joinToString("\n")
 
     internal fun redact(value: String): String = value
-        .replace(VLESS_LINK, "vless://[redacted]")
+        .replace(PROXY_LINK, "$1://[redacted]")
         .replace(UUID_VALUE, "[uuid]")
         .replace(TOKEN_QUERY, "$1=[redacted]")
 
     private companion object {
         const val MAX_ENTRIES = 300
-        val VLESS_LINK = Regex("""vless://\S+""", RegexOption.IGNORE_CASE)
+        val PROXY_LINK = Regex(
+            """(vless|vmess|trojan|ss|hysteria2|hy2|tuic)://\S+""",
+            RegexOption.IGNORE_CASE
+        )
         val UUID_VALUE = Regex("""\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b""")
         val TOKEN_QUERY = Regex("""(?i)(token|key|auth|uuid)=([^&\s]+)""")
     }

@@ -11,5 +11,5 @@ interface SubscriptionRepository {
     suspend fun refreshAll(): List<Result<Unit>>
     suspend fun delete(subscriptionId: String)
     suspend fun selectProfile(profileId: String)
-    suspend fun getProfile(profileId: String): VlessProfile?
+    suspend fun getProfile(profileId: String): ProxyProfile?
 }

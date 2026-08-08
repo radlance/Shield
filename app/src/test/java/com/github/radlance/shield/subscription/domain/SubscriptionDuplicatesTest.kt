@@ -48,6 +48,23 @@ class SubscriptionDuplicatesTest {
         )
     }
 
+    @Test
+    fun detectsEquivalentLegacyAndCanonicalVlessProfiles() {
+        val existing = profile(id = "legacy-id", subscriptionId = "existing")
+        val imported = profile(id = "canonical-id", subscriptionId = "new").copy(
+            outboundJson = """{"type":"vless","server":"example.com","server_port":443,"uuid":"00000000-0000-0000-0000-000000000000"}"""
+        )
+
+        assertTrue(
+            isExistingSubscription(
+                subscriptions = listOf(subscription(sourceUrl = null)),
+                profiles = listOf(existing),
+                source = SubscriptionSource.Direct("vless://link"),
+                importedProfiles = listOf(imported)
+            )
+        )
+    }
+
     private fun subscription(sourceUrl: String?) = Subscription(
         id = "subscription",
         name = "Subscription",

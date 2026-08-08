@@ -31,16 +31,25 @@ class SubscriptionResponsePolicyTest {
     }
 
     @Test
-    fun rejectsUnacceptedDeviceIdentifier() {
+    fun acceptsValidBodyWhenHwidIsNotSupported() {
         val response = DownloadedSubscription(
             body = "ignored",
             contentType = "text/plain",
             headers = mapOf("x-hwid-not-supported" to "true")
         )
 
-        val failure = runCatching { response.validatedBody() }
+        assertEquals("ignored", response.validatedBody())
+    }
 
-        assertTrue(failure.exceptionOrNull() is SubscriptionDeviceLimitException)
+    @Test
+    fun treatsHwidLimitAsCapabilityFlag() {
+        val response = DownloadedSubscription(
+            body = "subscription",
+            contentType = "text/plain",
+            headers = mapOf("x-hwid-limit" to "true")
+        )
+
+        assertEquals("subscription", response.validatedBody())
     }
 
     @Test

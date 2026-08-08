@@ -1,6 +1,6 @@
 package com.github.radlance.shield.vpn.data
 
-import com.github.radlance.shield.subscription.domain.VlessProfile
+import com.github.radlance.shield.subscription.domain.ProxyProfile
 import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
 import com.github.radlance.shield.vpn.routing.RoutingRuleSetPaths
@@ -24,7 +24,7 @@ class SingBoxConfigGenerator {
     private val json = Json { prettyPrint = false }
 
     fun generate(
-        profile: VlessProfile,
+        profile: ProxyProfile,
         routing: VpnRoutingConfig = VpnRoutingConfig()
     ): String {
         val ruleSetPaths = routing.ruleSetPaths
@@ -57,7 +57,7 @@ class SingBoxConfigGenerator {
                 )
             }
             putJsonArray("outbounds") {
-                add(vlessOutbound(profile))
+                add(proxyOutbound(profile))
                 add(buildJsonObject {
                     put("type", "direct")
                     put("tag", "direct")
@@ -251,7 +251,23 @@ class SingBoxConfigGenerator {
     private fun Collection<String>.toJsonArray(): JsonArray =
         buildJsonArray { forEach { add(JsonPrimitive(it)) } }
 
-    private fun vlessOutbound(profile: VlessProfile) = buildJsonObject {
+    private fun proxyOutbound(profile: ProxyProfile): JsonObject {
+        val canonical = profile.outboundJson?.let { encoded ->
+            json.parseToJsonElement(encoded) as? JsonObject
+                ?: error("Stored proxy outbound is not a JSON object")
+        }
+        if (canonical != null) {
+            return buildJsonObject {
+                canonical.forEach { (key, value) ->
+                    if (key != "tag") put(key, value)
+                }
+                put("tag", "proxy")
+            }
+        }
+        return vlessOutbound(profile)
+    }
+
+    private fun vlessOutbound(profile: ProxyProfile) = buildJsonObject {
         put("type", "vless")
         put("tag", "proxy")
         put("server", profile.server)

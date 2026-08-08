@@ -1,14 +1,14 @@
 # Shield
 
-Shield is an open-source Android VLESS VPN client built with Kotlin, Compose,
+Shield is an open-source Android proxy VPN client built with Kotlin, Compose,
 and sing-box.
 
 ## MVP features
 
-- HTTPS subscriptions containing plain-text or Base64-encoded `vless://` links
-- Remnawave-compatible Sing-box JSON subscriptions and device-limit headers
-- Direct VLESS import from paste, manual entry, QR, Android share, or deep link
-- VLESS TCP, WebSocket, and gRPC transports with TLS or REALITY
+- Plain or Base64 link lists, Sing-box JSON, Clash/Mihomo YAML, and SIP008 subscriptions
+- VLESS, VMess, Trojan, Shadowsocks, Hysteria2, and TUIC profiles
+- Direct proxy import from paste, manual entry, QR, Android share, or deep link
+- Provider metadata and explicit device-limit handling
 - Full-device IPv4/IPv6 VPN through Android `VpnService`
 - Smart routing: blocked resources use VPN while Russian domains and networks connect directly
 - Encrypted local profile storage and daily best-effort subscription refresh

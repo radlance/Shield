@@ -13,7 +13,7 @@ import com.github.radlance.shield.subscription.domain.SubscriptionGroup
 import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.SubscriptionSource
-import com.github.radlance.shield.subscription.domain.VlessProfile
+import com.github.radlance.shield.subscription.domain.ProxyProfile
 import com.github.radlance.shield.subscription.domain.accessStatus
 import com.github.radlance.shield.subscription.domain.isExistingSubscription
 import java.net.URI
@@ -41,7 +41,7 @@ class LocalSubscriptionRepository(
     }
 
     private val state: Flow<StoredState> = context.subscriptionStore.data.map { preferences ->
-        preferences[STATE_KEY]
+        (preferences[STATE_KEY] ?: preferences[LEGACY_STATE_KEY])
             ?.let { encrypted -> runCatching { decode(encrypted) }.getOrNull() }
             ?: StoredState()
     }
@@ -215,16 +215,17 @@ class LocalSubscriptionRepository(
         }
     }
 
-    override suspend fun getProfile(profileId: String): VlessProfile? =
+    override suspend fun getProfile(profileId: String): ProxyProfile? =
         state.first().profiles.firstOrNull { it.id == profileId }
 
     private suspend fun mutate(transform: (StoredState) -> StoredState) {
         mutex.withLock {
             context.subscriptionStore.edit { preferences ->
-                val current = preferences[STATE_KEY]
+                val current = (preferences[STATE_KEY] ?: preferences[LEGACY_STATE_KEY])
                     ?.let { encrypted -> runCatching { decode(encrypted) }.getOrNull() }
                     ?: StoredState()
                 preferences[STATE_KEY] = encode(transform(current))
+                preferences.remove(LEGACY_STATE_KEY)
             }
         }
     }
@@ -241,7 +242,7 @@ class LocalSubscriptionRepository(
     private fun defaultName(
         url: String?,
         profileTitle: String?,
-        profiles: List<VlessProfile>
+        profiles: List<ProxyProfile>
     ): String =
         profileTitle
             ?: profiles.firstOrNull()?.name
@@ -253,10 +254,11 @@ class LocalSubscriptionRepository(
         if (result.unsupportedTransports.isNotEmpty()) {
             val transports = result.unsupportedTransports.sorted().joinToString()
             throw IllegalArgumentException(
-                "The subscription only contains unsupported VLESS transports: $transports"
+                "The subscription only contains unsupported proxy protocols or transports: " +
+                    transports
             )
         }
-        throw IllegalArgumentException("No supported VLESS profiles were found")
+        throw IllegalArgumentException("No supported proxy profiles were found")
     }
 
     private fun encode(state: StoredState): String =
@@ -268,12 +270,13 @@ class LocalSubscriptionRepository(
     @Serializable
     private data class StoredState(
         val subscriptions: List<Subscription> = emptyList(),
-        val profiles: List<VlessProfile> = emptyList(),
+        val profiles: List<ProxyProfile> = emptyList(),
         val selectedProfileId: String? = null
     )
 
     private companion object {
-        val STATE_KEY = stringPreferencesKey("encrypted_state_v1")
+        val STATE_KEY = stringPreferencesKey("encrypted_state_v2")
+        val LEGACY_STATE_KEY = stringPreferencesKey("encrypted_state_v1")
     }
 
     private data class ImportPayload(

@@ -5,7 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.SystemClock
-import com.github.radlance.shield.subscription.domain.VlessProfile
+import com.github.radlance.shield.subscription.domain.ProxyProfile
 import com.github.radlance.shield.vpn.domain.ServerLatencyTester
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
 import com.github.radlance.shield.vpn.domain.VpnController
@@ -30,7 +30,7 @@ class AndroidServerLatencyTester(
     private val connectivity = context.applicationContext
         .getSystemService(ConnectivityManager::class.java)
 
-    override suspend fun measure(profile: VlessProfile): Long? {
+    override suspend fun measure(profile: ProxyProfile): Long? {
         val network = probeNetwork()
             ?: return null
         val deadline = SystemClock.elapsedRealtime() + PROBE_TIMEOUT_MILLIS

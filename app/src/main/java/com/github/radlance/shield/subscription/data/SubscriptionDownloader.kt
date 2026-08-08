@@ -27,14 +27,9 @@ interface SubscriptionDownloader {
 }
 
 internal fun DownloadedSubscription.validatedBody(): String {
-    if (headers.isEnabled("x-hwid-max-devices-reached") || headers.isEnabled("x-hwid-limit")) {
+    if (headers.isEnabled("x-hwid-max-devices-reached")) {
         throw SubscriptionDeviceLimitException(
             "The subscription device limit has been reached"
-        )
-    }
-    if (headers.isEnabled("x-hwid-not-supported")) {
-        throw SubscriptionDeviceLimitException(
-            "The subscription provider did not accept this device identifier"
         )
     }
     return body
@@ -154,7 +149,8 @@ class AndroidSubscriptionDownloader(
                 connection.setRequestProperty("X-Device-Model", Build.MODEL.orEmpty())
                 connection.setRequestProperty(
                     "Accept",
-                    "application/json, text/plain, application/octet-stream"
+                    "application/json, application/yaml, text/yaml, text/plain, " +
+                        "application/octet-stream"
                 )
 
                 val status = connection.responseCode
@@ -165,7 +161,19 @@ class AndroidSubscriptionDownloader(
                     "Subscription server returned HTTP $status"
                 }
                 DownloadedSubscription(
-                    body = connection.inputStream.bufferedReader().use { it.readText() },
+                    body = connection.inputStream.bufferedReader().use { reader ->
+                        val body = StringBuilder()
+                        val buffer = CharArray(8_192)
+                        while (true) {
+                            val read = reader.read(buffer)
+                            if (read < 0) break
+                            body.append(buffer, 0, read)
+                            require(body.length <= MAX_SUBSCRIPTION_LENGTH) {
+                                "Subscription response is too large"
+                            }
+                        }
+                        body.toString()
+                    },
                     contentType = connection.contentType,
                     headers = connection.headerFields
                         .filterKeys { it != null }
@@ -202,6 +210,7 @@ class AndroidSubscriptionDownloader(
         const val CONNECT_TIMEOUT_MILLIS = 15_000
         const val READ_TIMEOUT_MILLIS = 30_000
         const val SING_BOX_VERSION = "1.13.12"
+        const val MAX_SUBSCRIPTION_LENGTH = 5 * 1024 * 1024
     }
 }
 

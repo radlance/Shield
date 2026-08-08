@@ -3,6 +3,7 @@ package com.github.radlance.shield.vpn.data
 import com.github.radlance.shield.subscription.domain.VlessProfile
 import com.github.radlance.shield.subscription.domain.VlessSecurity
 import com.github.radlance.shield.subscription.domain.VlessTransport
+import com.github.radlance.shield.subscription.domain.ProxyProtocol
 import com.github.radlance.shield.vpn.routing.RoutingRuleSetPaths
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -16,6 +17,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SingBoxConfigGeneratorTest {
+    @Test
+    fun insertsCanonicalNonVlessOutboundAsProxy() {
+        val config = SingBoxConfigGenerator().generate(
+            VlessProfile(
+                id = "trojan-id",
+                subscriptionId = "subscription",
+                name = "Trojan",
+                server = "trojan.example.com",
+                port = 443,
+                protocol = ProxyProtocol.TROJAN,
+                outboundJson = """{"type":"trojan","tag":"provider-tag","server":"trojan.example.com","server_port":443,"password":"secret","tls":{"enabled":true}}"""
+            )
+        )
+
+        val root = Json.parseToJsonElement(config).jsonObject
+        val outbound = root["outbounds"]!!.jsonArray.first().jsonObject
+        assertEquals("trojan", outbound["type"]!!.jsonPrimitive.content)
+        assertEquals("proxy", outbound["tag"]!!.jsonPrimitive.content)
+        assertEquals("secret", outbound["password"]!!.jsonPrimitive.content)
+    }
+
     @Test
     fun createsTunOnlyRealityConfiguration() {
         val config = SingBoxConfigGenerator().generate(

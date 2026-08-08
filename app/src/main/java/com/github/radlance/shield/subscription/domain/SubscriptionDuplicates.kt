@@ -4,9 +4,9 @@ import java.net.URI
 
 internal fun isExistingSubscription(
     subscriptions: List<Subscription>,
-    profiles: List<VlessProfile>,
+    profiles: List<ProxyProfile>,
     source: SubscriptionSource,
-    importedProfiles: List<VlessProfile>
+    importedProfiles: List<ProxyProfile>
 ): Boolean = when (source) {
     is SubscriptionSource.Remote -> subscriptions.any { subscription ->
         subscription.sourceUrl?.let { existingUrl ->
@@ -15,8 +15,26 @@ internal fun isExistingSubscription(
     }
 
     is SubscriptionSource.Direct -> {
-        val existingProfileIds = profiles.mapTo(hashSetOf(), VlessProfile::id)
-        importedProfiles.any { it.id in existingProfileIds }
+        importedProfiles.any { imported ->
+            profiles.any { existing -> existing.sameEndpointIdentity(imported) }
+        }
+    }
+}
+
+private fun ProxyProfile.sameEndpointIdentity(other: ProxyProfile): Boolean {
+    if (id == other.id) return true
+    if (
+        protocol != other.protocol || server.lowercase() != other.server.lowercase() ||
+        port != other.port
+    ) return false
+    return when (protocol) {
+        ProxyProtocol.VLESS -> uuid.equals(other.uuid, ignoreCase = true) &&
+            transport == other.transport && security == other.security && flow == other.flow &&
+            serverName == other.serverName && path == other.path && host == other.host &&
+            grpcServiceName == other.grpcServiceName
+        ProxyProtocol.VMESS,
+        ProxyProtocol.TUIC -> uuid.isNotBlank() && uuid.equals(other.uuid, ignoreCase = true)
+        else -> false
     }
 }
 

@@ -6,6 +6,7 @@ import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.SubscriptionGroup
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.subscription.domain.SubscriptionSource
+import com.github.radlance.shield.subscription.domain.isSupportedProxyLink
 import com.github.radlance.shield.subscription.domain.accessStatus
 import com.github.radlance.shield.vpn.domain.ServerLatencyTester
 import com.github.radlance.shield.vpn.domain.VpnConnectionState
@@ -94,7 +95,7 @@ class HomeViewModel(
         viewModelScope.launch {
             importing.value = true
             message.value = null
-            val source = if (value.trim().startsWith("vless://", ignoreCase = true)) {
+            val source = if (value.trim().isSupportedProxyLink()) {
                 SubscriptionSource.Direct(value.trim())
             } else {
                 SubscriptionSource.Remote(value.trim())

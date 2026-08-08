@@ -7,7 +7,7 @@ import com.github.radlance.shield.subscription.data.AndroidSubscriptionDownloade
 import com.github.radlance.shield.subscription.data.LocalSubscriptionRepository
 import com.github.radlance.shield.subscription.data.SecretCipher
 import com.github.radlance.shield.subscription.data.SubscriptionDownloader
-import com.github.radlance.shield.subscription.data.VlessProfileParser
+import com.github.radlance.shield.subscription.data.UniversalProfileParser
 import com.github.radlance.shield.subscription.domain.ProfileParser
 import com.github.radlance.shield.subscription.domain.SubscriptionRepository
 import com.github.radlance.shield.vpn.data.AndroidServerLatencyTester
@@ -28,7 +28,7 @@ import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 val vpnModule = module {
-    single<ProfileParser> { VlessProfileParser() }
+    single<ProfileParser> { UniversalProfileParser() }
     single<SecretCipher> { AndroidSecretCipher() }
     single<SubscriptionDownloader> { AndroidSubscriptionDownloader(androidContext()) }
     single<SubscriptionRepository> {
