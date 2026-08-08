@@ -170,7 +170,7 @@ class ShieldVpnService :
         val previousReloadJob = reloadJob
         previousReloadJob?.cancel()
         if (prepare(this) != null) {
-            _connectionState.value = VpnConnectionState.PermissionRequired
+            updateConnectionState(VpnConnectionState.PermissionRequired)
             stopSelf()
             return
         }
@@ -180,7 +180,7 @@ class ShieldVpnService :
             _connectionState.value is VpnConnectionState.Connected
         ) return
         if (persistSelection) {
-            _connectionState.value = VpnConnectionState.Disconnecting
+            updateConnectionState(VpnConnectionState.Disconnecting)
         }
         val previousJob = connectionJob
         previousJob?.cancel()
@@ -203,7 +203,7 @@ class ShieldVpnService :
                 previousJob?.join()
                 closeCore()
                 activeProfileId = null
-                _connectionState.value = VpnConnectionState.Connecting(profile.name)
+                updateConnectionState(VpnConnectionState.Connecting(profile.name))
                 val prepared = prepareConfig(profile)
                 underlyingNetwork = findUnderlyingNetwork()
                     ?: physicalNetworkMonitor.awaitNetwork(PHYSICAL_NETWORK_TIMEOUT_MILLIS)
@@ -226,11 +226,11 @@ class ShieldVpnService :
                             "Unable to persist VPN state: ${error.message.orEmpty()}"
                         )
                     }
-                _connectionState.value = VpnConnectionState.Connected(
+                updateConnectionState(VpnConnectionState.Connected(
                     profileId = profile.id,
                     profileName = profile.name,
                     connectedAtElapsedRealtime = SystemClock.elapsedRealtime()
-                )
+                ))
                 diagnosticLog.record("Connected through ${profile.name}")
                 if (prepared.smartRouting) {
                     scope.launch {
@@ -283,7 +283,7 @@ class ShieldVpnService :
         reloadGeneration.incrementAndGet()
         val previousReloadJob = reloadJob
         previousReloadJob?.cancel()
-        _connectionState.value = VpnConnectionState.Disconnecting
+        updateConnectionState(VpnConnectionState.Disconnecting)
         val previousJob = connectionJob
         previousJob?.cancel()
         activeProfileId = null
@@ -292,7 +292,7 @@ class ShieldVpnService :
             previousJob?.join()
             closeCore()
             clearPersistedProfile()
-            _connectionState.value = VpnConnectionState.Disconnected
+            updateConnectionState(VpnConnectionState.Disconnected)
             diagnosticLog.record("VPN disconnected")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -307,6 +307,11 @@ class ShieldVpnService :
         commandServer = null
         activeConfig = null
         closeTun()
+    }
+
+    private fun updateConnectionState(state: VpnConnectionState) {
+        _connectionState.value = state
+        runCatching { ShieldVpnTileService.requestTileUpdate(this) }
     }
 
     private suspend fun prepareConfig(profile: VlessProfile): PreparedConfig {
@@ -331,7 +336,7 @@ class ShieldVpnService :
 
     private suspend fun fail(message: String) {
         diagnosticLog.record("VPN error: $message")
-        _connectionState.value = VpnConnectionState.Error(message)
+        updateConnectionState(VpnConnectionState.Error(message))
         clearPersistedProfile()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -573,30 +578,30 @@ class ShieldVpnService :
                         diagnosticLog.record(
                             "Routing reload preparation failed: ${error.message.orEmpty()}"
                         )
-                        _connectionState.value = connected
+                        updateConnectionState(connected)
                         return@withLock
                     }
                 currentCoroutineContext().ensureActive()
                 if (generation != reloadGeneration.get()) {
-                    _connectionState.value = connected
+                    updateConnectionState(connected)
                     return@withLock
                 }
                 if (prepared.config == previousConfig) {
                     return@withLock
                 }
 
-                _connectionState.value = VpnConnectionState.Reconnecting(connected.profileName)
+                updateConnectionState(VpnConnectionState.Reconnecting(connected.profileName))
                 diagnosticLog.record(
                     "Reloading routing configuration: smart=${prepared.smartRouting}"
                 )
                 val server = commandServer ?: run {
-                    _connectionState.value = connected
+                    updateConnectionState(connected)
                     return@withLock
                 }
                 underlyingNetwork = findUnderlyingNetwork()
                     ?: run {
                         diagnosticLog.record("Routing reload postponed: physical network unavailable")
-                        _connectionState.value = connected
+                        updateConnectionState(connected)
                         return@withLock
                     }
                 publishUnderlyingNetwork(underlyingNetwork)
@@ -609,7 +614,7 @@ class ShieldVpnService :
                 ) return@withLock
                 if (reloadError == null) {
                     activeConfig = prepared.config
-                    _connectionState.value = connected
+                    updateConnectionState(connected)
                     diagnosticLog.record("Routing configuration applied")
                     return@withLock
                 }
@@ -622,7 +627,7 @@ class ShieldVpnService :
                 }.exceptionOrNull()
                 if (rollbackError == null) {
                     activeConfig = previousConfig
-                    _connectionState.value = connected
+                    updateConnectionState(connected)
                     diagnosticLog.record("Previous routing configuration restored")
                 } else {
                     diagnosticLog.record("Routing rollback failed")
@@ -675,8 +680,8 @@ class ShieldVpnService :
         commandServer?.resetNetwork()
         val connected = _connectionState.value as? VpnConnectionState.Connected
         if (connected != null) {
-            _connectionState.value = VpnConnectionState.Reconnecting(connected.profileName)
-            _connectionState.value = connected
+            updateConnectionState(VpnConnectionState.Reconnecting(connected.profileName))
+            updateConnectionState(connected)
         }
     }
 
