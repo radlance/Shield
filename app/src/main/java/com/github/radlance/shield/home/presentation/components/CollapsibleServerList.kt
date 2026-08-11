@@ -18,18 +18,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -47,10 +55,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.radlance.shield.R
 import com.github.radlance.shield.home.presentation.ServerItem
@@ -58,6 +68,7 @@ import com.github.radlance.shield.subscription.domain.SubscriptionAccessStatus
 import com.github.radlance.shield.subscription.domain.SubscriptionMetadata
 import com.github.radlance.shield.uikit.tokens.icons
 import com.github.radlance.shield.uikit.tokens.spacing
+import com.github.radlance.shield.uikit.vector.KeepOffIcon
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -70,14 +81,17 @@ fun CollapsibleServerList(
     isInitiallyExpanded: Boolean = true,
     selectedId: String? = null,
     onServerSelected: (String) -> Unit = {},
+    isPinned: Boolean = false,
     onRefresh: (() -> Unit)? = null,
     onPing: (() -> Unit)? = null,
+    onTogglePin: (() -> Unit)? = null,
     onDelete: (() -> Unit)? = null,
     isRefreshing: Boolean = false,
     isPinging: Boolean = false,
     error: String? = null
 ) {
     var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
+    var showActionsMenu by remember { mutableStateOf(false) }
     val summary = subscriptionSummary(metadata)
     val hasMetadata = metadata.hasVisibleData()
 
@@ -122,20 +136,53 @@ fun CollapsibleServerList(
                         vertical = MaterialTheme.spacing.s
                     )
             ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(MaterialTheme.icons.large)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = stringResource(
+                            if (isExpanded) R.string.collapse else R.string.expand
+                        ),
+                        modifier = Modifier
+                            .size(MaterialTheme.icons.medium)
+                            .graphicsLayer { rotationZ = rotationAngle },
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(MaterialTheme.spacing.xs))
+
                 Column(
                     verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs),
                     modifier = Modifier.weight(1f)
                 ) {
-                    BasicText(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        autoSize = titleAutoSize
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
+                    ) {
+                        if (isPinned) {
+                            Icon(
+                                imageVector = Icons.Rounded.PushPin,
+                                contentDescription = stringResource(R.string.pinned_subscription),
+                                modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        BasicText(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            autoSize = titleAutoSize,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
                     summary?.let {
                         Text(
@@ -179,90 +226,166 @@ fun CollapsibleServerList(
                     )
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.xxs)
-                ) {
-                    onPing?.let {
+                if (onTogglePin != null || onPing != null || onRefresh != null || onDelete != null) {
+                    Box {
                         IconButton(
-                            onClick = it,
-                            enabled = items.isNotEmpty() && !isPinging,
+                            onClick = { showActionsMenu = true },
                             shapes = IconButtonDefaults.shapes(),
                             modifier = Modifier.size(MaterialTheme.icons.large)
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.Speed,
-                                contentDescription = stringResource(R.string.ping_servers),
-                                modifier = Modifier.size(MaterialTheme.icons.mediumSmall)
+                                imageVector = Icons.Rounded.MoreVert,
+                                contentDescription = stringResource(R.string.subscription_actions),
+                                modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
 
-                    onRefresh?.let {
-                        IconButton(
-                            onClick = handleRefresh,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(MaterialTheme.icons.large)
+                        DropdownMenu(
+                            expanded = showActionsMenu,
+                            onDismissRequest = { showActionsMenu = false },
+                            modifier = Modifier.width(180.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            tonalElevation = 8.dp,
+                            shadowElevation = 8.dp
                         ) {
-                            AnimatedContent(
-                                targetState = isRefreshing,
-                                transitionSpec = {
-                                    (fadeIn(animationSpec = tween(200)) + scaleIn(
-                                        initialScale = 0.8f,
-                                        animationSpec = tween(200)
-                                    )) togetherWith
-                                            (fadeOut(animationSpec = tween(200)) + scaleOut(
-                                                targetScale = 0.8f,
-                                                animationSpec = tween(200)
-                                            ))
-                                },
-                                label = "RefreshLoadingTransition"
-                            ) { refreshing ->
-                                if (refreshing) {
-                                    LoadingIndicator(
-                                        modifier = Modifier.size(MaterialTheme.icons.mediumSmall)
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Refresh,
-                                        contentDescription = stringResource(R.string.refresh),
-                                        modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            onTogglePin?.let { togglePin ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            stringResource(
+                                                if (isPinned) R.string.unpin else R.string.pin
+                                            )
+                                        )
+                                    },
+                                    onClick = {
+                                        showActionsMenu = false
+                                        togglePin()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = if (isPinned) {
+                                                KeepOffIcon
+                                            } else {
+                                                Icons.Rounded.PushPin
+                                            },
+                                            contentDescription = null,
+                                            modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
+                                            tint = if (isPinned) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .padding(horizontal = 8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                )
+                            }
+
+                            if (onPing != null || onRefresh != null || onDelete != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+
+                            onPing?.let { ping ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.ping_servers)) },
+                                    onClick = {
+                                        showActionsMenu = false
+                                        ping()
+                                    },
+                                    enabled = items.isNotEmpty() && !isPinging,
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Speed,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(MaterialTheme.icons.mediumSmall)
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .padding(horizontal = 8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                )
+                            }
+
+                            if (onRefresh != null || onDelete != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+
+                            onRefresh?.let {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.refresh)) },
+                                    onClick = {
+                                        showActionsMenu = false
+                                        handleRefresh()
+                                    },
+                                    enabled = !isRefreshing,
+                                    leadingIcon = {
+                                        AnimatedContent(
+                                            targetState = isRefreshing,
+                                            transitionSpec = {
+                                                (fadeIn(animationSpec = tween(200)) + scaleIn(
+                                                    initialScale = 0.8f,
+                                                    animationSpec = tween(200)
+                                                )) togetherWith
+                                                        (fadeOut(animationSpec = tween(200)) + scaleOut(
+                                                            targetScale = 0.8f,
+                                                            animationSpec = tween(200)
+                                                        ))
+                                            },
+                                            label = "RefreshLoadingTransition"
+                                        ) { refreshing ->
+                                            if (refreshing) {
+                                                LoadingIndicator(
+                                                    modifier = Modifier.size(MaterialTheme.icons.mediumSmall)
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Refresh,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .padding(horizontal = 8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                )
+                            }
+
+                            if (onRefresh != null && onDelete != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+
+                            onDelete?.let { delete ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.delete)) },
+                                    onClick = {
+                                        showActionsMenu = false
+                                        delete()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Delete,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .padding(horizontal = 8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                )
                             }
                         }
-                    }
-
-                    onDelete?.let {
-                        IconButton(
-                            onClick = it,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(MaterialTheme.icons.large)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Delete,
-                                contentDescription = stringResource(R.string.delete_subscription),
-                                modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(MaterialTheme.icons.large)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.KeyboardArrowDown,
-                            contentDescription = stringResource(
-                                if (isExpanded) R.string.collapse else R.string.expand
-                            ),
-                            modifier = Modifier
-                                .size(MaterialTheme.icons.medium)
-                                .graphicsLayer { rotationZ = rotationAngle },
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }

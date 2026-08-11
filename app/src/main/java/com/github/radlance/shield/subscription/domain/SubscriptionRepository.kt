@@ -10,6 +10,7 @@ interface SubscriptionRepository {
     suspend fun refresh(subscriptionId: String): Result<Unit>
     suspend fun refreshAll(): List<Result<Unit>>
     suspend fun delete(subscriptionId: String)
+    suspend fun setPinned(subscriptionId: String, pinned: Boolean)
     suspend fun selectProfile(profileId: String)
     suspend fun getProfile(profileId: String): ProxyProfile?
 }

@@ -47,12 +47,17 @@ class LocalSubscriptionRepository(
     }
 
     override val groups: Flow<List<SubscriptionGroup>> = state.map { stored ->
-        stored.subscriptions.map { subscription ->
-            SubscriptionGroup(
-                subscription = subscription,
-                profiles = stored.profiles.filter { it.subscriptionId == subscription.id }
+        stored.subscriptions
+            .sortedWith(
+                compareBy<Subscription> { it.pinOrder == null }
+                    .thenBy { it.pinOrder ?: Long.MAX_VALUE }
             )
-        }
+            .map { subscription ->
+                SubscriptionGroup(
+                    subscription = subscription,
+                    profiles = stored.profiles.filter { it.subscriptionId == subscription.id }
+                )
+            }
     }
 
     override val selectedProfileId: Flow<String?> = state.map { it.selectedProfileId }
@@ -204,6 +209,25 @@ class LocalSubscriptionRepository(
                 selectedProfileId = current.selectedProfileId
                     ?.takeIf { selected -> remainingProfiles.any { it.id == selected } }
                     ?: remainingProfiles.firstOrNull()?.id
+            )
+        }
+    }
+
+    override suspend fun setPinned(subscriptionId: String, pinned: Boolean) {
+        mutate { current ->
+            val nextPinOrder = if (pinned) {
+                (current.subscriptions.mapNotNull { it.pinOrder }.maxOrNull() ?: -1L) + 1
+            } else {
+                null
+            }
+            current.copy(
+                subscriptions = current.subscriptions.map { subscription ->
+                    if (subscription.id == subscriptionId) {
+                        subscription.copy(pinOrder = nextPinOrder)
+                    } else {
+                        subscription
+                    }
+                }
             )
         }
     }

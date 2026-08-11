@@ -19,6 +19,10 @@
     <string name="flashlight_off">Выключить фонарик</string>
     <string name="open_add_menu">Открыть меню добавления</string>
     <string name="close_add_menu">Закрыть меню добавления</string>
+    <string name="subscription_actions">Действия подписки</string>
+    <string name="pin">Закрепить</string>
+    <string name="unpin">Открепить</string>
+    <string name="pinned_subscription">Закреплённая подписка</string>
     <string name="empty_server_list">Список серверов пуст</string>
     <string name="check_subscription">Проверьте подписку</string>
     <string name="disconnect">Отключиться</string>

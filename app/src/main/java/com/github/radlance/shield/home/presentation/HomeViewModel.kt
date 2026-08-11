@@ -221,6 +221,12 @@ class HomeViewModel(
         }
     }
 
+    fun setPinned(subscriptionId: String, pinned: Boolean) {
+        viewModelScope.launch {
+            repository.setPinned(subscriptionId, pinned)
+        }
+    }
+
     fun connectSelected() {
         val id = uiState.value.selectedProfileId ?: return
         unavailableMessage(id, uiState.value.groups)?.let {

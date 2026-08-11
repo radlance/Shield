@@ -18,6 +18,10 @@
     <string name="flashlight_off">Turn flashlight off</string>
     <string name="open_add_menu">Open add menu</string>
     <string name="close_add_menu">Close add menu</string>
+    <string name="subscription_actions">Subscription actions</string>
+    <string name="pin">Pin</string>
+    <string name="unpin">Unpin</string>
+    <string name="pinned_subscription">Pinned subscription</string>
     <string name="empty_server_list">Server list is empty</string>
     <string name="check_subscription">Please check your subscription</string>
     <string name="disconnect">Disconnect</string>

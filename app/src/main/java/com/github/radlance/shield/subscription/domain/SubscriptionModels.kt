@@ -10,6 +10,7 @@ data class Subscription(
     val createdAtEpochMillis: Long,
     val lastUpdatedAtEpochMillis: Long? = null,
     val lastError: String? = null,
+    val pinOrder: Long? = null,
     val metadata: SubscriptionMetadata = SubscriptionMetadata()
 )
 

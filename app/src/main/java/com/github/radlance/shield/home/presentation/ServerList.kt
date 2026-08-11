@@ -12,6 +12,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.github.radlance.shield.home.presentation.components.CollapsibleServerList
@@ -72,20 +73,26 @@ fun ServerList(
                     .verticalScroll(scrollState)
             ) {
                 groups.forEach { group ->
-                    CollapsibleServerList(
-                        title = group.title,
-                        items = group.items,
-                        metadata = group.metadata,
-                        accessStatus = group.accessStatus,
-                        selectedId = selectedId,
-                        onServerSelected = onServerSelected,
-                        onRefresh = group.onRefresh,
-                        onPing = group.onPing,
-                        onDelete = group.onDelete,
-                        isRefreshing = group.isRefreshing,
-                        isPinging = group.isPinging,
-                        error = group.error
-                    )
+                    key(group.id) {
+                        ServerListTransitions.AnimatedItem {
+                            CollapsibleServerList(
+                                title = group.title,
+                                items = group.items,
+                                metadata = group.metadata,
+                                accessStatus = group.accessStatus,
+                                isPinned = group.isPinned,
+                                selectedId = selectedId,
+                                onServerSelected = onServerSelected,
+                                onRefresh = group.onRefresh,
+                                onPing = group.onPing,
+                                onTogglePin = group.onTogglePin,
+                                onDelete = group.onDelete,
+                                isRefreshing = group.isRefreshing,
+                                isPinging = group.isPinging,
+                                error = group.error
+                            )
+                        }
+                    }
                 }
             }
         }

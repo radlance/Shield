@@ -142,6 +142,7 @@ fun HomeScreen(
             title = group.subscription.name,
             metadata = group.subscription.metadata,
             accessStatus = group.subscription.metadata.accessStatus(nowEpochSeconds),
+            isPinned = group.subscription.pinOrder != null,
             items = group.profiles.map { profile ->
                 ServerItem(
                     id = profile.id,
@@ -160,6 +161,13 @@ fun HomeScreen(
             onPing = {
                 alerts.onFocusChanged()
                 viewModel.pingSubscription(group.subscription.id)
+            },
+            onTogglePin = {
+                alerts.onFocusChanged()
+                viewModel.setPinned(
+                    subscriptionId = group.subscription.id,
+                    pinned = group.subscription.pinOrder == null
+                )
             },
             onDelete = {
                 alerts.onFocusChanged()
