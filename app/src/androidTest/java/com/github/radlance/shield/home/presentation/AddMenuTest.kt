@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
@@ -145,7 +145,7 @@ class AddMenuTest {
                     )
 
                     AddMenu(
-                        scrollState = rememberScrollState(),
+                        scrollState = rememberLazyListState(),
                         expanded = expanded,
                         canExpand = canExpand,
                         onExpandedChange = { expanded = it },
@@ -189,7 +189,7 @@ class AddMenuTest {
                                 dismissLabel = CLOSE_MENU_DESCRIPTION
                             )
                             AddMenu(
-                                scrollState = rememberScrollState(),
+                                scrollState = rememberLazyListState(),
                                 expanded = expanded,
                                 canExpand = homePageSettled,
                                 onExpandedChange = { expanded = it },

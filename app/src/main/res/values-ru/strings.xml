@@ -23,6 +23,10 @@
     <string name="pin">Закрепить</string>
     <string name="unpin">Открепить</string>
     <string name="pinned_subscription">Закреплённая подписка</string>
+    <string name="reorder_subscription">Изменить порядок подписки</string>
+    <string name="move_subscription_up">Переместить подписку вверх</string>
+    <string name="move_subscription_down">Переместить подписку вниз</string>
+    <string name="pinned_subscription_reorder_failed">Не удалось изменить порядок закреплённых подписок</string>
     <string name="empty_server_list">Список серверов пуст</string>
     <string name="check_subscription">Проверьте подписку</string>
     <string name="disconnect">Отключиться</string>

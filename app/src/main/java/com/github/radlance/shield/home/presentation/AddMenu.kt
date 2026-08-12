@@ -4,12 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -24,7 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -51,11 +50,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import com.github.radlance.shield.R
+import com.github.radlance.shield.home.presentation.components.ShadowlessToggleFloatingActionButton
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AddMenu(
-    scrollState: ScrollState,
+    scrollState: LazyListState,
     expanded: Boolean,
     modifier: Modifier = Modifier,
     canExpand: Boolean = true,
@@ -67,21 +67,34 @@ fun AddMenu(
     var isScrollingUp by remember { mutableStateOf(true) }
 
     LaunchedEffect(scrollState) {
-        var previousValue = scrollState.value
+        var previousIndex = scrollState.firstVisibleItemIndex
+        var previousOffset = scrollState.firstVisibleItemScrollOffset
 
-        snapshotFlow { scrollState.value }.collect { currentValue ->
-            if (currentValue < previousValue) {
+        snapshotFlow {
+            scrollState.firstVisibleItemIndex to scrollState.firstVisibleItemScrollOffset
+        }.collect { (currentIndex, currentOffset) ->
+            if (
+                currentIndex < previousIndex ||
+                currentIndex == previousIndex && currentOffset < previousOffset
+            ) {
                 isScrollingUp = true
-            } else if (currentValue > previousValue) {
+            } else if (
+                currentIndex > previousIndex ||
+                currentIndex == previousIndex && currentOffset > previousOffset
+            ) {
                 isScrollingUp = false
             }
-            previousValue = currentValue
+            previousIndex = currentIndex
+            previousOffset = currentOffset
         }
     }
 
     val fabVisible by remember {
         derivedStateOf {
-            scrollState.value == 0 || !scrollState.canScrollForward || isScrollingUp
+            scrollState.firstVisibleItemIndex == 0 &&
+                scrollState.firstVisibleItemScrollOffset == 0 ||
+                !scrollState.canScrollForward ||
+                isScrollingUp
         }
     }
 
@@ -93,7 +106,6 @@ fun AddMenu(
             Triple(Icons.Filled.ContentPaste, R.string.paste_from_clipboard, onPasteFromClipboard),
             Triple(Icons.Filled.QrCode, R.string.qr_code, onQrCode),
         )
-
     FloatingActionButtonMenu(
         modifier = modifier,
         expanded = expanded,
@@ -111,7 +123,7 @@ fun AddMenu(
                 },
                 state = rememberTooltipState()
             ) {
-                ToggleFloatingActionButton(
+                ShadowlessToggleFloatingActionButton(
                     modifier = Modifier
                         .animateFloatingActionButton(
                             visible = fabVisible || expanded,

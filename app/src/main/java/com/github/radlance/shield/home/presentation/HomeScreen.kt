@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -76,7 +76,7 @@ fun HomeScreen(
     val alerts = koinInject<AlertsRepository>()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scrollState = rememberScrollState()
+    val scrollState = rememberLazyListState()
     var showImportDialog by remember { mutableStateOf(false) }
     var importInitialValue by remember { mutableStateOf("") }
     var subscriptionPendingDeletion by remember {
@@ -250,6 +250,7 @@ fun HomeScreen(
                         alerts.onFocusChanged()
                         qrScannerLauncher.launch(QrScannerActivity.createIntent(context))
                     },
+                    onPinnedOrderChanged = viewModel::reorderPinned,
                     scrollState = scrollState,
                     modifier = Modifier.weight(1f)
                 )
@@ -481,6 +482,8 @@ private fun connectionLabel(state: VpnConnectionState): String = when (state) {
 private fun localizeHomeMessage(context: Context, message: String): String = when (message) {
     "Import failed" -> context.getString(R.string.import_failed)
     "Refresh failed" -> context.getString(R.string.refresh_failed)
+    "Pinned subscription reorder failed" ->
+        context.getString(R.string.pinned_subscription_reorder_failed)
     "The subscription has expired" -> context.getString(R.string.subscription_expired)
     "The subscription traffic limit has been reached" ->
         context.getString(R.string.subscription_traffic_exhausted)

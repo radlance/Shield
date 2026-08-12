@@ -191,6 +191,7 @@ class HomeViewModelLatencyTest {
         override suspend fun refreshAll(): List<Result<Unit>> = error("Not used")
         override suspend fun delete(subscriptionId: String) = Unit
         override suspend fun setPinned(subscriptionId: String, pinned: Boolean) = Unit
+        override suspend fun reorderPinned(subscriptionIds: List<String>) = Unit
         override suspend fun selectProfile(profileId: String) = Unit
         override suspend fun getProfile(profileId: String): VlessProfile? = groups.value
             .flatMap(SubscriptionGroup::profiles)

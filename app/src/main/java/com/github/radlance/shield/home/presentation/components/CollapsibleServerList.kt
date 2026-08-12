@@ -14,6 +14,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PushPin
@@ -52,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,9 +92,11 @@ fun CollapsibleServerList(
     onDelete: (() -> Unit)? = null,
     isRefreshing: Boolean = false,
     isPinging: Boolean = false,
-    error: String? = null
+    error: String? = null,
+    dragHandleModifier: Modifier? = null,
+    isDragging: Boolean = false
 ) {
-    var isExpanded by remember { mutableStateOf(isInitiallyExpanded) }
+    var isExpanded by rememberSaveable { mutableStateOf(isInitiallyExpanded) }
     var showActionsMenu by remember { mutableStateOf(false) }
     val summary = subscriptionSummary(metadata)
     val hasMetadata = metadata.hasVisibleData()
@@ -102,6 +108,14 @@ fun CollapsibleServerList(
             stiffness = Spring.StiffnessMediumLow
         ),
         label = "ChevronRotation"
+    )
+    val dragScale by animateFloatAsState(
+        targetValue = if (isDragging) 1.01f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "SubscriptionDragScale"
     )
     val titleAutoSize = remember {
         TextAutoSize.StepBased(
@@ -118,6 +132,10 @@ fun CollapsibleServerList(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = dragScale
+                scaleY = dragScale
+            }
             .padding(horizontal = MaterialTheme.spacing.m, vertical = MaterialTheme.spacing.xs)
     ) {
         Surface(
@@ -224,6 +242,31 @@ fun CollapsibleServerList(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+                }
+
+                dragHandleModifier?.let { handleModifier ->
+                    val dragHandleInteractionSource = remember { MutableInteractionSource() }
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = handleModifier
+                            .size(MaterialTheme.icons.large)
+                            .clickable(
+                                interactionSource = dragHandleInteractionSource,
+                                indication = null,
+                                onClick = {}
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.DragHandle,
+                            contentDescription = null,
+                            modifier = Modifier.size(MaterialTheme.icons.mediumSmall),
+                            tint = if (isDragging) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
                 }
 
                 if (onTogglePin != null || onPing != null || onRefresh != null || onDelete != null) {

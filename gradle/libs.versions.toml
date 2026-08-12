@@ -20,6 +20,7 @@ workManager = "2.11.2"
 cameraX = "1.6.1"
 mlKitBarcodeScanning = "17.3.0"
 snakeYamlEngine = "3.1.1"
+composeReorderable = "0.9.6"
 
 [libraries]
 
@@ -54,6 +55,7 @@ androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", versi
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "cameraX" }
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlKitBarcodeScanning" }
 snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeYamlEngine" }
+compose-reorderable = { module = "org.burnoutcrew.composereorderable:reorderable", version.ref = "composeReorderable" }
 
 [plugins]
 kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

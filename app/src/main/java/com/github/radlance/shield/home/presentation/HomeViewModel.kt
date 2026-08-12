@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -48,11 +49,19 @@ class HomeViewModel(
     private val message = MutableStateFlow<String?>(null)
     private val pingingSubscriptionIds = MutableStateFlow<Set<String>>(emptySet())
     private val serverLatencies = MutableStateFlow<Map<String, ServerLatency>>(emptyMap())
+    private val pendingPinnedOrder = MutableStateFlow<List<String>?>(null)
     private val pingJobs = mutableMapOf<String, Job>()
     private val pingPermits = Semaphore(MAX_CONCURRENT_PINGS)
 
-    private val baseState = combine(
+    private val orderedGroups = combine(
         repository.groups,
+        pendingPinnedOrder
+    ) { groups, pendingOrder ->
+        groups.withPinnedOrderOverride(pendingOrder)
+    }
+
+    private val baseState = combine(
+        orderedGroups,
         repository.selectedProfileId,
         vpnController.state,
         busySubscriptionIds,
@@ -227,6 +236,40 @@ class HomeViewModel(
         }
     }
 
+    fun reorderPinned(subscriptionIds: List<String>) {
+        val currentPinnedIds = uiState.value.groups
+            .filter { it.subscription.pinOrder != null }
+            .map { it.subscription.id }
+        if (
+            subscriptionIds == currentPinnedIds ||
+            subscriptionIds.size != subscriptionIds.distinct().size ||
+            subscriptionIds.toSet() != currentPinnedIds.toSet()
+        ) {
+            return
+        }
+
+        pendingPinnedOrder.value = subscriptionIds
+        viewModelScope.launch {
+            try {
+                repository.reorderPinned(subscriptionIds)
+                repository.groups.first { groups ->
+                    groups.filter { it.subscription.pinOrder != null }
+                        .map { it.subscription.id } == subscriptionIds
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (pendingPinnedOrder.value == subscriptionIds) {
+                    message.value = error.message ?: "Pinned subscription reorder failed"
+                }
+            } finally {
+                if (pendingPinnedOrder.value == subscriptionIds) {
+                    pendingPinnedOrder.value = null
+                }
+            }
+        }
+    }
+
     fun connectSelected() {
         val id = uiState.value.selectedProfileId ?: return
         unavailableMessage(id, uiState.value.groups)?.let {
@@ -262,4 +305,14 @@ class HomeViewModel(
     private companion object {
         const val MAX_CONCURRENT_PINGS = 8
     }
+}
+
+internal fun List<SubscriptionGroup>.withPinnedOrderOverride(
+    pinnedOrder: List<String>?
+): List<SubscriptionGroup> {
+    if (pinnedOrder == null) return this
+    val pinned = filter { it.subscription.pinOrder != null }
+    if (pinnedOrder.toSet() != pinned.mapTo(hashSetOf()) { it.subscription.id }) return this
+    val groupsById = pinned.associateBy { it.subscription.id }
+    return pinnedOrder.mapNotNull(groupsById::get) + filter { it.subscription.pinOrder == null }
 }

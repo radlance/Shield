@@ -22,6 +22,10 @@
     <string name="pin">Pin</string>
     <string name="unpin">Unpin</string>
     <string name="pinned_subscription">Pinned subscription</string>
+    <string name="reorder_subscription">Reorder subscription</string>
+    <string name="move_subscription_up">Move subscription up</string>
+    <string name="move_subscription_down">Move subscription down</string>
+    <string name="pinned_subscription_reorder_failed">Could not reorder pinned subscriptions</string>
     <string name="empty_server_list">Server list is empty</string>
     <string name="check_subscription">Please check your subscription</string>
     <string name="disconnect">Disconnect</string>

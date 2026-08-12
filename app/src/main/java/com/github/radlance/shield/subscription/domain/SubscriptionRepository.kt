@@ -11,6 +11,7 @@ interface SubscriptionRepository {
     suspend fun refreshAll(): List<Result<Unit>>
     suspend fun delete(subscriptionId: String)
     suspend fun setPinned(subscriptionId: String, pinned: Boolean)
+    suspend fun reorderPinned(subscriptionIds: List<String>)
     suspend fun selectProfile(profileId: String)
     suspend fun getProfile(profileId: String): ProxyProfile?
 }

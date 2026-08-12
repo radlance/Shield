@@ -232,6 +232,12 @@ class LocalSubscriptionRepository(
         }
     }
 
+    override suspend fun reorderPinned(subscriptionIds: List<String>) {
+        mutate { current ->
+            current.copy(subscriptions = current.subscriptions.withPinnedOrder(subscriptionIds))
+        }
+    }
+
     override suspend fun selectProfile(profileId: String) {
         mutate { current ->
             require(current.profiles.any { it.id == profileId }) { "Profile not found" }
@@ -309,4 +315,20 @@ class LocalSubscriptionRepository(
         val profileTitle: String? = null,
         val metadata: SubscriptionMetadata = SubscriptionMetadata()
     )
+}
+
+internal fun List<Subscription>.withPinnedOrder(subscriptionIds: List<String>): List<Subscription> {
+    val pinnedIds = filter { it.pinOrder != null }.map { it.id }
+    require(subscriptionIds.size == subscriptionIds.distinct().size) {
+        "Pinned subscription order contains duplicate IDs"
+    }
+    require(subscriptionIds.toSet() == pinnedIds.toSet()) {
+        "Pinned subscription order must contain every pinned subscription exactly once"
+    }
+    val orderById = subscriptionIds.withIndex().associate { (index, id) -> id to index.toLong() }
+    return map { subscription ->
+        orderById[subscription.id]
+            ?.let { order -> subscription.copy(pinOrder = order) }
+            ?: subscription
+    }
 }
